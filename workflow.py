@@ -464,10 +464,8 @@ def main(instance_id, max_iterations, max_finish_nodes, result_path=None,use_tes
             current_date = datetime.now().strftime("%Y-%m-%d")
             instance_path = f'{base_dir}/trajectory/{instance_id}/'
             persist_path = f'{base_dir}/trajectory/{instance_id}/{current_date}_trajectory.json'
-            experience_path = f"{base_dir}/experience/{instance_id}/{current_date}_experience.json"
             
             instance_logger.info(f"📊 Trajectory路径: {persist_path}")
-            instance_logger.info(f"📊 Experience路径: {experience_path}")
 
             instance_logger.info("⚙️ 配置actions和system prompt...")
             value_function = ValueFunction(completion_model=value_model)
