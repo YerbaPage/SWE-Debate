@@ -2,7 +2,7 @@
   <img src="asset/logo.png" alt="SWE-Debate Logo" width="400"/>
 </div>
 
-# SWE-Debate: Enhanced Code Issue Resolution with Entity-Based Localization
+# SWE-Debate: Competitive Multi-Agent Debate for Software Issue Resolution
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
