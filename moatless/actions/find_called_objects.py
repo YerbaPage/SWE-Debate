@@ -1,15 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
--------------------------------------------------
-   File Name：     find_called_objects
-   Description :
-   Author :       Silin
-   date：          2025/3/10
--------------------------------------------------
-   Change Activity:
-                   2025/3/10:
--------------------------------------------------
-"""
 import logging
 from fnmatch import fnmatch
 from typing import List, Optional, Tuple, Type, ClassVar
@@ -112,13 +101,6 @@ class FindCalledObject(SearchBaseAction):
                     file_pattern="**/config/*.py",
                 ),
             ),
-            # FewShotExample.create(
-            #     user_input="telephone_boos = {'silin': phone1, 'han': phone2}\n\nThis code tries to get the name of silin to map phone1, but the value of phone1 does not yet appear in the current code, and I need to search further for the value of phone1",
-            #     action=FindCalledObjectArgs(
-            #         thoughts="To find the timeout configuration, I'll search for the exact variable declaration 'DEFAULT_TIMEOUT =' in config files",
-            #         called_object="DEFAULT_TIMEOUT =",
-            #     ),
-            # ),
             FewShotExample.create(
                 user_input='''This code uses the handling function to get the result, but the handling function is not in the code I see, I need to search for the implementation code of the handling.''',
                 action=FindCalledObjectArgs(

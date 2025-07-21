@@ -26,6 +26,8 @@ class ReActCompletionModel(CompletionModel):
         total_usage = Usage()
         retry_count = 0
 
+        if not isinstance(response_model, list):
+            response_model = [response_model]
         for action in response_model:
             action_input_schemas.append(
                 f" * {action.name} {action.format_schema_for_llm()}"

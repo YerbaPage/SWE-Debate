@@ -21,6 +21,85 @@ from moatless.exceptions import CompletionRejectError, CompletionRuntimeError
 logger = logging.getLogger(__name__)
 
 
+def estimate_tokens(text: str) -> int:
+    """估算文本的token数量 (简单估算: 1 token ≈ 4个字符)"""
+    if not text:
+        return 0
+    return len(text) // 4
+
+
+def truncate_messages_if_needed(messages: list[dict], max_tokens: int = 60000) -> list[dict]:
+    """如果消息超过token限制，则截断消息列表
+    
+    Args:
+        messages: 消息列表
+        max_tokens: 最大token数量限制
+        
+    Returns:
+        截断后的消息列表
+    """
+    if not messages:
+        return messages
+        
+    # 计算总token数
+    total_tokens = sum(
+        estimate_tokens(msg.get("content", ""))
+        for msg in messages
+    )
+    
+    if total_tokens <= max_tokens:
+        return messages
+        
+    logger.warning(f"消息总长度 {total_tokens} tokens 超过限制 {max_tokens} tokens，进行截断")
+    
+    # 保留系统消息和最后几条消息
+    result_messages = []
+    remaining_tokens = max_tokens
+    
+    # 首先保留系统消息
+    system_messages = [msg for msg in messages if msg.get("role") == "system"]
+    for msg in system_messages:
+        tokens = estimate_tokens(msg.get("content", ""))
+        if tokens <= remaining_tokens:
+            result_messages.append(msg)
+            remaining_tokens -= tokens
+        else:
+            # 截断系统消息
+            content = msg.get("content", "")
+            max_chars = remaining_tokens * 4
+            truncated_content = content[:max_chars] + "...[截断]"
+            result_messages.append({
+                "role": msg.get("role"),
+                "content": truncated_content
+            })
+            remaining_tokens = 0
+            break
+    
+    # 然后从后往前添加非系统消息
+    non_system_messages = [msg for msg in messages if msg.get("role") != "system"]
+    for msg in reversed(non_system_messages):
+        tokens = estimate_tokens(msg.get("content", ""))
+        if tokens <= remaining_tokens:
+            result_messages.insert(-len(system_messages) if system_messages else 0, msg)
+            remaining_tokens -= tokens
+        else:
+            # 如果还有剩余token，截断这条消息
+            if remaining_tokens > 100:  # 至少保留100个token
+                content = msg.get("content", "")
+                max_chars = remaining_tokens * 4
+                truncated_content = content[:max_chars] + "...[截断]"
+                result_messages.insert(-len(system_messages) if system_messages else 0, {
+                    "role": msg.get("role"),
+                    "content": truncated_content
+                })
+            break
+    
+    final_tokens = sum(estimate_tokens(msg.get("content", "")) for msg in result_messages)
+    logger.info(f"消息截断完成: {total_tokens} -> {final_tokens} tokens")
+    
+    return result_messages
+
+
 class LLMResponseFormat(str, Enum):
     TOOLS = "tool_call"
     JSON = "json"
@@ -210,7 +289,6 @@ class CompletionModel(BaseModel):
                 if not assistant_message:
                     raise CompletionRuntimeError("Empty response from model")
         
-                print(f'assistant {assistant_message}')
                 messages.append({"role": "assistant", "content": assistant_message})
         
                 response = response_model.model_validate_json(assistant_message)
@@ -276,6 +354,20 @@ class CompletionModel(BaseModel):
         """
         litellm.drop_params = True
 
+        # 检查并截断消息以适应模型的上下文窗口
+        if "deepseek" in self.model.lower():
+            # DeepSeek模型的上下文窗口是65536 tokens，保留一些余量
+            max_input_tokens = 60000  # 保留5536 tokens用于生成响应
+            messages = truncate_messages_if_needed(messages, max_input_tokens)
+        elif "gpt-4" in self.model.lower():
+            # GPT-4模型的上下文窗口是8192 tokens
+            max_input_tokens = 6000  # 保留2192 tokens用于生成响应
+            messages = truncate_messages_if_needed(messages, max_input_tokens)
+        else:
+            # 其他模型使用默认限制
+            max_input_tokens = 60000
+            messages = truncate_messages_if_needed(messages, max_input_tokens)
+
         @tenacity.retry(
             stop=tenacity.stop_after_attempt(6),
             wait=tenacity.wait_exponential(multiplier=3),
@@ -286,21 +378,33 @@ class CompletionModel(BaseModel):
             ),
         )
         def _do_completion():
-            return litellm.completion(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-                messages=messages,
-                metadata=self.metadata or {},
-                timeout=self.timeout,
-                api_base=self.model_base_url,
-                api_key=self.model_api_key,
-                stop=self.stop_words,
-                tools=tools,
-                tool_choice=tool_choice,
-                response_format=response_format,
-                request_timeout=self.timeout,
-            )
+            nonlocal messages
+            try:
+                return litellm.completion(
+                    model=self.model,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
+                    messages=messages,
+                    metadata=self.metadata or {},
+                    timeout=self.timeout,
+                    api_base=self.model_base_url,
+                    api_key=self.model_api_key,
+                    stop=self.stop_words,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    response_format=response_format,
+                    request_timeout=self.timeout,
+                )
+            except Exception as e:
+                error_msg = str(e)
+                if "ContextWindowExceededError" in error_msg or "context length" in error_msg.lower():
+                    # 如果仍然超过上下文窗口，进行更激进的截断
+                    logger.warning(f"上下文窗口仍然超限，进行更激进的截断: {error_msg}")
+                    if "deepseek" in self.model.lower():
+                        messages = truncate_messages_if_needed(messages, 45000)  # 更保守的限制
+                    else:
+                        messages = truncate_messages_if_needed(messages, 4000)   # 更保守的限制
+                raise e
 
         try:
             return _do_completion()

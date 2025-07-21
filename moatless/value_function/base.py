@@ -130,7 +130,6 @@ class ValueFunction(BaseModel):
             ]
 
         try:
-            # print('The messages of the value model is ', messages)
             completion_response = self.completion_model.create_completion(
                 messages=messages, system_prompt=system_prompt, response_model=Reward
             )

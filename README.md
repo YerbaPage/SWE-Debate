@@ -1,300 +1,97 @@
-# Moatless Tree Search
-
-### Code for paper [SWE-Search: Enhancing Software Agents with Monte Carlo Tree Search and Iterative Refinement](https://arxiv.org/abs/2410.20285)
-
-Note: The original development code can be found at [github.com/a-antoniades/swe-search](https://github.com/a-antoniades/swe-search). It is only intended for reproducing the results in the paper. This is a clean refactor with a modular design, which will be maintained and extended.
-
-##
-
 <div align="center">
-
-[![License](https://img.shields.io/badge/License-Apache_2.0-4D9885.svg?style=flat&logo=apache)](./LICENSE)
-[![arXiv](https://img.shields.io/badge/arXiv-2408.08435-B31B1B.svg?style=flat&logo=arxiv)](https://arxiv.org/abs/2410.20285)
-[![Streamlit](https://img.shields.io/badge/Demo-Streamlit-FF4B4B.svg?style=flat&logo=streamlit)](https://streamlit.moatless.ai/)
-[![YouTube](https://img.shields.io/badge/Video-YouTube-FF0000.svg?style=flat&logo=youtube)](https://www.youtube.com/watch?v=VcEHX_TNDgQ)
-[![Twitter](https://img.shields.io/badge/Tweet-X-1DA1F2.svg?style=flat&logo=twitter)](https://x.com/anton_iades/status/1852022811113697307)
-[![Discord](https://img.shields.io/badge/👾-Discord-7289DA?style=flat)](https://discord.gg/74VX8ppBEg)
+  <img src="asset/logo.png" alt="SWE-Debate Logo" width="400"/>
 </div>
 
-<div align="center">
-  <a href="assets/method.pdf" target="_blank">
-    <img src="./assets/method.png" alt="Method Diagram" width="100%">
-  </a>
+# SWE-Debate: Enhanced Code Issue Resolution with Entity-Based Localization
 
-  <p>Overview of SWE-Search showing the tree search process, where states (nodes) and actions (edges) are evaluated using contextual information and value function feedback to guide expansion.</p>
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+
+SWE-Debate, a competitive multi-agent debate framework that promotes diverse reasoning paths and achieves more consolidated fault localization.SWE-Debate reframes issue resolution through graph-guided local-ization and structured debate mechanisms. 
+
+## 🎯 Method Features
+
+This project integrates an advanced **Entity Localization Pipeline** based on the Moatless framework, achieving the following breakthrough features:
+
+- **🔍 Intelligent Entity Extraction**: Automatically identifies key code entities (classes, methods, functions, variables) from issue descriptions
+- **🕸️ Graph-Driven Search**: Performs deep traversal and relevance analysis based on code dependency graphs
+- **⛓️ Localization Chain Generation**: Constructs complete code localization chains from problems to solutions
+- **🤖 Multi-Agent Collaborative Debate**: Multiple expert agents collaborate in analysis and debate to ensure accuracy and comprehensiveness of solutions
+- **📋 Automated Solution Generation**: Generates detailed, highly instructive code modification guidance plans
+
+
+<div align="center">
+  <img src="asset/overview.png" alt="SWE-Debate Methodology Flow" width="800"/>
+  <p><i>Figure: Complete workflow of SWE-Debate</i></p>
 </div>
 
-## Installation
 
-Install the package:
+```
 
-```shell
+## 🚀 Quick Start
+
+### Requirements
+
+- Python 3.12+
+- OpenAI API key or LLM API supporting OpenAI format
+
+### Installation Steps
+
+1. **Clone the project**
+```bash
+git clone https://github.com/YerbaPage/SWE-Debate
+cd SWE-Debate
+```
+
+2. **Install dependencies**
+```bash
+# Install main dependencies
+pip install -r localization/requirements.txt
+
+# Install SWE-Search dependencies
 pip install moatless-tree-search
 ```
 
-### Environment Setup
+3. **Configure environment variables**
+```bash
+# Create .env file
+cp .env.example .env
 
-Before running the evaluation, you'll need:
-
-1. At least one LLM provider API key (e.g., OpenAI, Anthropic, etc.)
-2. A Voyage AI API key from [voyageai.com](https://voyageai.com) to use the pre-embedded vector stores for SWE-Bench instances.
-3. (Optional) Access to a testbed environment - see [moatless-testbeds](https://github.com/aorwall/moatless-testbeds) for setup instructions
-
-You can configure these settings by either:
-
-1. Create a `.env` file in the project root (copy from `.env.example`):
-
-   ```shell
-   cp .env.example .env
-   # Edit .env with your values
-   ```
-
-2. Or export the variables directly:
-
-   ```shell
-   # Directory for storing vector index store files  
-   export INDEX_STORE_DIR="/tmp/index_store"    
-
-   # Directory for storing clonedrepositories 
-   export REPO_DIR="/tmp/repos"
-
-   # Required: At least one LLM provider API key
-   export OPENAI_API_KEY="<your-key>"
-   export ANTHROPIC_API_KEY="<your-key>"
-   export HUGGINGFACE_API_KEY="<your-key>"
-   export DEEPSEEK_API_KEY="<your-key>"
-
-   # ...or Base URL for custom LLM API service (optional)
-   export CUSTOM_LLM_API_BASE="<your-base-url>"
-   export CUSTOM_LLM_API_KEY="<your-key>"
-
-   # Required: API Key for Voyage Embeddings
-   export VOYAGE_API_KEY="<your-key>"
-
-   # Optional: Configuration for testbed environment (https://github.com/aorwall/moatless-testbeds)
-   export TESTBED_API_KEY="<your-key>"
-   export TESTBED_BASE_URL="<your-base-url>"
-   ```
-
-## Streamlit
-
-To launch the Streamlit app, run:
-
-```shell
-# Launch with direct file loading
-moatless-streamlit path/to/trajectory.json
-
-# Launch interactive UI (file can be selected in browser)
-moatless-streamlit
+# Edit .env file, add your API configuration
+OPENAI_API_KEY=your_api_key_here
+OPENAI_BASE_URL=your_base_url_here  # Optional, for custom API endpoints
 ```
 
-The following badges are used to indicate the status of a node:
 
-| Badge | Shape | Color | Description |
-|-------|-------|-------|-------------|
-| ⭐ | Star | Green | Node is marked as resolved |
-| ❌ | X | Red | Invalid edits or failed tests |
-| 🟢 | Circle | Green | Correct code spans present in the context |
-| 🟡 | Circle | Yellow | Either:<br>• Found files but not spans<br>• Found spans but in wrong files<br>|
-
-## Evaluation
-
-To run the evaluation script:
-
-```shell
-moatless-evaluate \
-    --model "gpt-4o-mini" \
-    --repo_base_dir /tmp/repos \
-    --eval_dir "./evaluations" \
-    --eval_name mts \
-    --temp 0.7 \
-    --num_workers 1 \
-    --use_testbed \
-    --feedback \
-    --max_iterations 100 \
-    --max_expansions 5
-```
-
-You can optionally set the `--instance_ids` to evaluate on a specific instance or a list of instances.
-
-Use `--use_testbed` if you got access to a testbed environment. Otherwise, tests will not be run.
-
-## Development
-
-Install with Poetry:
-
-```shell
-poetry install --with dev
-```
-
-### Apple Silicon
-
-To install the dependencies on Apple Silicon (Mac M1/M2/M3 etc.), you need the following workaround to get the `graphviz` package working:
-
-```shell
-brew install graphviz
-export CFLAGS="-I $(brew --prefix graphviz)/include"
-export LDFLAGS="-L $(brew --prefix graphviz)/lib"
-poetry install --with dev
-```
-
-## Examples
-
-### Example: Basic Flow
-
-Basic setup similar to the moatless-tools agent.
+### Entity Localization Pipeline
 
 ```python
-from moatless.agent.code_agent import CodingAgent
-from moatless.agent.code_prompts import SIMPLE_CODE_PROMPT
-from moatless.benchmark.swebench import create_repository
-from moatless.benchmark.utils import get_moatless_instance
-from moatless.completion import CompletionModel
-from moatless.file_context import FileContext
-from moatless.index import CodeIndex
-from moatless.search_tree import SearchTree
-from moatless.actions import FindClass, FindFunction, FindCodeSnippet, SemanticSearch, ViewCode, StringReplace, CreateFile, AppendString, RunTests, Finish, Reject
+from localization.entity_localization_pipeline import EntityLocalizationPipeline
 
-index_store_dir = "/tmp/index_store"
-repo_base_dir = "/tmp/repos"
-persist_path = "trajectory.json"
-
-instance = get_moatless_instance("django__django-16379")
-
-completion_model = CompletionModel(model="gpt-4o", temperature=0.0)
-
-repository = create_repository(instance)
-
-code_index = CodeIndex.from_index_name(
-    instance["instance_id"], index_store_dir=index_store_dir, file_repo=repository
+# initialize
+pipeline = EntityLocalizationPipeline(
+    model_name="deepseek/deepseek-chat",
+    max_depth=5
 )
 
-actions = [
-    FindClass(code_index=code_index, repository=repository),
-    FindFunction(code_index=code_index, repository=repository),
-    FindCodeSnippet(code_index=code_index, repository=repository),
-    SemanticSearch(code_index=code_index, repository=repository),
-    ViewCode(repository=repository),
-    StringReplace(repository=repository, code_index=code_index),
-    CreateFile(repository=repository, code_index=code_index),
-    AppendString(repository=repository, code_index=code_index),
-    RunTests(repository=repository, code_index=code_index),
-    Finish(),
-    Reject()
-]
-
-file_context = FileContext(repo=repository)
-agent = CodingAgent(actions=actions, completion=completion_model, system_prompt=SIMPLE_CODE_PROMPT)
-
-search_tree = SearchTree.create(
-    message=instance["problem_statement"],
-    agent=agent,
-    file_context=file_context,
-    max_expansions=1,
-    max_iterations=50
+# run
+result = pipeline.run_pipeline(
+    instance_data=instance_data,
+    context=file_context,
+    max_initial_entities=5
 )
-
-node = search_tree.run_search()
-print(node.observation.message)
 ```
 
-### Example: MCTS Flow
 
-How to setup the evaluation flow with MCTS and testbeds.
+## 🔗 Related Links
 
-```python
-from moatless.agent.code_agent import CodingAgent
-from moatless.benchmark.swebench import create_repository
-from moatless.benchmark.utils import get_moatless_instance
-from moatless.completion import CompletionModel
-from moatless.discriminator import AgentDiscriminator
-from moatless.feedback import FeedbackGenerator
-from moatless.file_context import FileContext
-from moatless.index import CodeIndex
-from moatless.search_tree import SearchTree
-from moatless.selector import BestFirstSelector
-from moatless.actions import FindClass, FindFunction, FindCodeSnippet, SemanticSearch, ViewCode, Finish, Reject, RunTests, StringReplace, CreateFile
-from moatless.value_function.base import ValueFunction
-from testbeds.sdk import TestbedSDK
-from moatless.runtime.testbed import TestbedEnvironment
+- [Moatless Framework](https://github.com/aorwall/moatless-tree-search)
+- [LocAgent](https://github.com/gersteinlab/LocAgent)
+- [SWE-bench Benchmark](https://www.swebench.com/)
 
-index_store_dir = "/tmp/index_store"
-repo_base_dir = "/tmp/repos"
-persist_path = "trajectory.json"
+## 🙏 Acknowledgments
 
-instance = get_moatless_instance("django__django-16379")
+This project draws inspiration from and builds upon the methodologies presented in LocAgent. We acknowledge their contributions to the field of automated code localization.
 
-completion_model = CompletionModel(model="gpt-4o-mini", temperature=0.7)
+---
 
-repository = create_repository(instance, repo_base_dir=repo_base_dir)
-
-code_index = CodeIndex.from_index_name(
-    instance["instance_id"], index_store_dir=index_store_dir, file_repo=repository
-)
-
-file_context = FileContext(repo=repository)
-
-selector = BestFirstSelector()
-
-value_function = ValueFunction(completion=completion_model)
-
-discriminator = AgentDiscriminator(
-    completion=completion_model,
-    n_agents=5,
-    n_rounds=3,
-)
-
-feedback = FeedbackGenerator()
-
-runtime = TestbedEnvironment(
-    testbed_sdk=TestbedSDK(),
-    repository=repository,
-    instance=instance
-)
-
-actions = [
-    FindClass(code_index=code_index, repository=repository),
-    FindFunction(code_index=code_index, repository=repository),
-    FindCodeSnippet(code_index=code_index, repository=repository),
-    SemanticSearch(code_index=code_index, repository=repository),
-    ViewCode(repository=repository),
-    StringReplace(repository=repository, code_index=code_index),
-    CreateFile(repository=repository, code_index=code_index),
-    RunTests(repository=repository, code_index=code_index),
-    Finish(),
-    Reject()
-]
-
-agent = CodingAgent(actions=actions, completion=completion_model)
-
-search_tree = SearchTree.create(
-    message=instance["problem_statement"],
-    agent=agent,
-    file_context=file_context,
-    selector=selector,
-    value_function=value_function,
-    discriminator=discriminator,
-    feedback_generator=feedback,
-    max_iterations=100,
-    max_expansions=3,
-    max_depth=25,
-    persist_path=persist_path,
-)
-
-node = search_tree.run_search()
-print(node.observation.message)
-```
-
-### Citation
-
-```bibtex
-@misc{antoniades2024swesearchenhancingsoftwareagents,
-      title={SWE-Search: Enhancing Software Agents with Monte Carlo Tree Search and Iterative Refinement}, 
-      author={Antonis Antoniades and Albert Örwall and Kexun Zhang and Yuxi Xie and Anirudh Goyal and William Wang},
-      year={2024},
-      eprint={2410.20285},
-      archivePrefix={arXiv},
-      primaryClass={cs.AI},
-      url={https://arxiv.org/abs/2410.20285}, 
-}
-```

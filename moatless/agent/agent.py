@@ -19,7 +19,6 @@ from moatless.index.code_index import CodeIndex
 from moatless.message_history import MessageHistoryGenerator
 from moatless.node import Node, ActionStep
 from moatless.repository.repository import Repository
-from moatless.silinchen.demo_exp import DemoPool
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +36,7 @@ class ActionAgent(BaseModel):
         default_factory=lambda: MessageHistoryGenerator(),
         description="Generator for message history",
     )
-    demo_exp_pool: DemoPool = Field(
-        default_factory=lambda: DemoPool(),
-        description="the demonstrations pool for assistant",
-    )
-    
+
     _completion: CompletionModel = PrivateAttr()
     _action_map: dict[Type[ActionArguments], Action] = PrivateAttr(default_factory=dict)
 
@@ -98,7 +93,7 @@ class ActionAgent(BaseModel):
                 )
         return self
 
-    def run(self, node: Node, experience, instructor):
+    def run(self, node: Node):
         """Run the agent on a node to generate and execute an action."""
 
         if node.action:
@@ -110,30 +105,17 @@ class ActionAgent(BaseModel):
         action_args = [action.args_schema for action in self.actions]
 
         messages = self.message_generator.generate(node)
-
-        # add experience
-        if experience:
-            messages.append({'role': 'user',  'content': [{'type': 'text',
-                                                           'text': experience}]})
+        # logger.info(f"system_prompt:\n{system_prompt}")
+        logger.info(f"messages\n{messages}")
         
         logger.info(f"Node{node.node_id}: Build action with {len(messages)} messages")
         try:
             # print(f'Messages {messages}')
             # print(f'response_model {action_args}')
-            reason, instruction, ty = instructor.instruct(messages)
-            node.instruct_message = {'reasoning': reason, 'instruction': instruction}
-            if self.use_few_shots:
-                instruction += self.demo_exp_pool.generate_few_shots(ty)
-
-            print(f'the reasoning is:\n {reason},\n the instruction is:\n {instruction}\n and the type of the hoped action is {ty}.')
-                
-            instruct_message = [{'role': 'user',  'content': [{'type': 'text',
-                                                           'text': instruction}]}]
-            
             completion_response = self._completion.create_completion(
-                instruct_message, system_prompt=system_prompt, response_model=action_args
+                messages, system_prompt=system_prompt, response_model=action_args
             )
-            print('Response Structured Output of assistant: ', completion_response.structured_outputs)
+            logger.info('Response Structured Output:\n%s', completion_response.structured_outputs)
 
             if completion_response.structured_outputs:
                 node.action_steps = [
@@ -193,11 +175,11 @@ class ActionAgent(BaseModel):
                 action_step.action, node.file_context, node.workspace
             )
             if not action_step.observation:
-                print(
+                logger.info(
                     f"Node{node.node_id}: Action {action_step.action.name} returned no observation"
                 )
             else:
-                print('Observation: ', action_step.observation)
+                logger.info('Observation: %s', action_step.observation)
                 node.terminal = action_step.observation.terminal
                 if action_step.observation.execution_completion:
                     action_step.completion = (
@@ -222,8 +204,8 @@ class ActionAgent(BaseModel):
         """Generate a system prompt for the agent."""
 
         system_prompt = self.system_prompt
-        # if self.use_few_shots:
-        #     system_prompt += "\n\n" + self.generate_few_shots()
+        if self.use_few_shots:
+            system_prompt += "\n\n" + self.generate_few_shots()
 
         return system_prompt
 

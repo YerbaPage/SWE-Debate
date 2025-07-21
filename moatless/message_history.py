@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class MessageHistoryGenerator(BaseModel):
     message_history_type: MessageHistoryType = Field(
-        default=MessageHistoryType.MESSAGES,
+        default=MessageHistoryType.REACT,
         description="Type of message history to generate",
     )
     include_file_context: bool = Field(
@@ -104,21 +104,15 @@ class MessageHistoryGenerator(BaseModel):
             tool_calls = []
             tool_responses = []
 
-            if previous_node.feedback_data:
-                messages.append(
-                    ChatCompletionUserMessage(
-                        role="user", content=previous_node.feedback_data.feedback
-                    )
-                )
-
-            if previous_node.instruct_message:
-                # instruction["reasoning"] = previous_node.instruct_message['reasoning']
-                instruct_message = {'role': 'user',  'content': [{'type': 'text',
-                                               'text': "Instruction: " + previous_node.instruct_message['instruction']}]}
-                messages.append(instruct_message)
-            
             if not previous_node.assistant_message and not previous_node.action_steps:
+                if previous_node.feedback_data:
+                    messages.append(
+                        ChatCompletionUserMessage(
+                            role="user", content=previous_node.feedback_data.feedback
+                        )
+                    )
                 continue
+
 
             for action_step in previous_node.action_steps:
                 tool_idx += 1
@@ -166,6 +160,13 @@ class MessageHistoryGenerator(BaseModel):
 
             messages.append(assistant_message)
             messages.extend(tool_responses)
+        
+            if previous_node.feedback_data:
+                messages.append(
+                    ChatCompletionUserMessage(
+                        role="user", content=previous_node.feedback_data.feedback
+                    )
+                )
 
         logger.info(f"Generated {len(messages)} messages with {tokens} tokens")
 

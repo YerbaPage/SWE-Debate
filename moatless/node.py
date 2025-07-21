@@ -72,10 +72,7 @@ class Node(BaseModel):
         default_factory=list,
         description="The artifact changes associated with the node",
     )
-    
-    instruct_message: Optional[Dict[str, str]] = Field(
-        None, description="The instruction for this node"
-    )
+
     user_message: Optional[str] = Field(
         None, description="The user message for this node"
     )

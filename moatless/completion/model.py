@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 from typing import Optional, Any, Union, Self, ClassVar
-
+import json_repair
 from docstring_parser import parse
 from instructor.utils import classproperty
 from pydantic import BaseModel, model_validator, Field, ValidationError
@@ -393,7 +393,17 @@ class StructuredOutput(BaseModel):
             raise ValidationError("Message is empty")
 
         try:
-            parsed_data = json.loads(json_data, strict=False)
+            import re
+            match = re.search(r"```(?:\w+)?\n?(.*?)```", json_data, re.DOTALL)
+            if match:
+                logger.info("Match:\n" + match.group(1).strip())
+                json_data = match.group(1).strip()
+
+            parsed_data = json_repair.loads(json_data)
+            if parsed_data.get('action_type'):
+                if parsed_data['action_type'].endswith("Args"):
+                    parsed_data['action_type'] = parsed_data['action_type'][:-len("Args")]
+            logger.info("JSON Validate Successful")
 
             def unescape_values(obj):
                 if isinstance(obj, dict):

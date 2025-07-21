@@ -1,4 +1,5 @@
 import json
+import json_repair
 import logging
 import os
 from datetime import datetime
@@ -18,7 +19,7 @@ from moatless.feedback.feedback_agent import FeedbackAgent
 from moatless.feedback.reward_feedback import RewardFeedbackGenerator
 from moatless.file_context import FileContext
 from moatless.index.code_index import CodeIndex
-from moatless.node import Node, generate_ascii_tree
+from moatless.node import Node, generate_ascii_tree, FeedbackData
 from moatless.repository.repository import Repository
 from moatless.runtime.runtime import RuntimeEnvironment
 from moatless.selector import BestFirstSelector, Selector, SoftmaxSelector, LLMSelector
@@ -65,6 +66,8 @@ class SearchTree(BaseModel):
         None, description="Path to persist the search tree."
     )
     unique_id: int = Field(default=0, description="Unique ID counter for nodes.")
+    duplicate_count: int = Field(default=0, description="Counter for duplicate nodes")
+    max_duplicate_count: int = Field(default=5, description="Maximum allowed duplicate nodes before restarting")
 
     max_expansions: int = Field(
         1, description="The maximum number of expansions of one state."
@@ -122,6 +125,7 @@ class SearchTree(BaseModel):
         min_finished_nodes: Optional[int] = None,
         max_finished_nodes: Optional[int] = None,
         reward_threshold: Optional[float] = None,
+        max_duplicate_count: int = 5,
         simulation_depth: int = 1,
         max_depth: int = 10,
     ) -> "SearchTree":
@@ -248,6 +252,7 @@ class SearchTree(BaseModel):
         """Run the MCTS algorithm for a specified number of iterations."""
 
         self.assert_runnable()
+        self.duplicate_count = 0  # Reset duplicate counter at start
 
         self.log(logger.info, generate_ascii_tree(self.root))
 
@@ -257,56 +262,61 @@ class SearchTree(BaseModel):
                 f"Restarting search tree with {len(self.root.get_all_nodes())} nodes",
             )
 
-        while not self.is_finished():
-            total_cost = self.total_usage().completion_cost
-            self.log(
-                logger.info,
-                f"Run iteration {len(self.root.get_all_nodes())}",
-                cost=total_cost,
-            )
+        try:
+            while not self.is_finished():
+                total_cost = self.total_usage().completion_cost
+                self.log(
+                    logger.info,
+                    f"Run iteration {len(self.root.get_all_nodes())}",
+                    cost=total_cost,
+                )
 
-            node = self._select(self.root)
+                node = self._select(self.root)
 
-            if node:
-                new_node = self._expand(node)
-                self._simulate(new_node)
-                self._backpropagate(new_node)
-                self.maybe_persist()
-                self.log(logger.info, generate_ascii_tree(self.root, new_node))
+                if node:
+                    new_node = self._expand(node)
+                    self._simulate(new_node)
+                    self._backpropagate(new_node)
+                    self.maybe_persist()
+                    self.log(logger.info, generate_ascii_tree(self.root, new_node))
 
-                # Emit iteration event
-                self.emit_event(
-                    "tree_iteration",
-                    {
-                        "iteration": len(self.root.get_all_nodes()),
-                        "total_cost": total_cost,
-                        "best_reward": max(
-                            (n.reward.value if n.reward else 0)
-                            for n in self.root.get_all_nodes()
-                        ),
-                        "finished_nodes": len(self.get_finished_nodes()),
-                        "total_nodes": len(self.root.get_all_nodes()),
-                        "best_node_id": self.get_best_trajectory().node_id
-                        if self.get_best_trajectory()
-                        else None,
-                    },
+                    # Emit iteration event
+                    self.emit_event(
+                        "tree_iteration",
+                        {
+                            "iteration": len(self.root.get_all_nodes()),
+                            "total_cost": total_cost,
+                            "best_reward": max(
+                                (n.reward.value if n.reward else 0)
+                                for n in self.root.get_all_nodes()
+                            ),
+                            "finished_nodes": len(self.get_finished_nodes()),
+                            "total_nodes": len(self.root.get_all_nodes()),
+                            # "best_node_id": self.get_best_trajectory().node_id
+                            # if self.get_best_trajectory()
+                            # else None,
+                        },
+                    )
+                else:
+                    self.log(logger.info, "Failed to select node, trying again...")
+
+            if not len(self.get_finished_nodes()):
+                self.log(
+                    logger.warning,
+                    f"Search completed with no finished nodes. {len(self.root.get_all_nodes())} nodes created.",
                 )
             else:
-                self.log(logger.info, "Search complete: no more nodes to expand.")
-                break
+                self.log(
+                    logger.info,
+                    f"Search completed with {len(self.get_finished_nodes())} finished nodes. {len(self.root.get_all_nodes())} nodes created.",
+                )
 
-        if not len(self.get_finished_nodes()):
-            self.log(
-                logger.warning,
-                f"Search completed with no finished nodes. {len(self.root.get_all_nodes())} nodes created.",
-            )
-        else:
-            self.log(
-                logger.info,
-                f"Search completed with {len(self.get_finished_nodes())} finished nodes. {len(self.root.get_all_nodes())} nodes created.",
-            )
-
-        return self.get_best_trajectory()
+            return self.get_best_trajectory()
+        except RuntimeError as e:
+            if str(e) == "MAX_DUPLICATES_EXCEEDED":
+                self.log(logger.warning, f"Search terminated due to too many duplicate nodes ({self.duplicate_count})")
+                raise RuntimeError("MCTS_DUPLICATES_EXCEEDED")
+            raise e
 
     def _select(self, node: Node) -> Optional[Node]:
         """Select a node for expansion using the UCT algorithm."""
@@ -368,6 +378,13 @@ class SearchTree(BaseModel):
                 self.agent.actions,
             )
 
+        # Check if the child node is a duplicate
+        if child_node.is_duplicate:
+            self.duplicate_count += 1
+            self.log(logger.info, f"Node{child_node.node_id} is a duplicate. Total duplicates: {self.duplicate_count}")
+            if self.duplicate_count >= self.max_duplicate_count:
+                raise RuntimeError("MAX_DUPLICATES_EXCEEDED")
+
         self.log(
             logger.info, f"Expanded Node{node.node_id} to new Node{child_node.node_id}"
         )
@@ -387,9 +404,16 @@ class SearchTree(BaseModel):
                     node=node
                 )
                 node.completions["value_function"] = completion_response
+                import re
+                match = re.search(r"```(?:\w+)?\n?(.*?)```", completion_response.response['choices'][0]['message']['content'], re.DOTALL)
+                if match:
+                    logger.info("Match" + match.group(1).strip())
+                    json_data = match.group(1).strip()
+
+                f = json_repair.loads(json_data)
                 node.feedback_data = FeedbackData(
                                                 analysis=None,
-                                                feedback=json.loads(completion_response.response['choices'][0]['message']['content'])['feedback'],
+                                                feedback=f['feedback'],
                                                 suggested_node_id=None,
                                             )
                 self.log(
@@ -602,6 +626,7 @@ class SearchTree(BaseModel):
         min_finished_nodes: Optional[int] = None,
         max_finished_nodes: Optional[int] = None,
         reward_threshold: Optional[float] = None,
+        max_duplicate_count: int = 5,
         simulation_depth: int = 1,
         max_depth: Optional[int] = None,
     ) -> "SearchTree":
