@@ -4,7 +4,7 @@
 
 # SWE-Debate: Competitive Multi-Agent Debate for Software Issue Resolution
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
 SWE-Debate, a competitive multi-agent debate framework that promotes diverse reasoning paths and achieves more consolidated fault localization.SWE-Debate reframes issue resolution through graph-guided local-ization and structured debate mechanisms. 
