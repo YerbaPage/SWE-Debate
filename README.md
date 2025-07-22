@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="asset/logo.png" alt="SWE-Debate Logo" width="400"/>
+  <img src="asset/logo.png" alt="SWE-Debate Logo" width="200"/>
 </div>
 
 # SWE-Debate: Competitive Multi-Agent Debate for Software Issue Resolution
