@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple, Any
 import logging
 
 class LocalizationChainEmbedding:
-    """定位链嵌入计算器"""
+    """Localization chain embedding calculator"""
     
     def __init__(self, model_name: str = "intfloat/multilingual-e5-large-instruct", 
                  cache_dir: str = '/data/swebench/workspace_agentless/Agentless/models'):
@@ -14,23 +14,23 @@ class LocalizationChainEmbedding:
         self.model = AutoModel.from_pretrained(model_name, cache_dir=cache_dir)
         
     def average_pool(self, last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
-        """平均池化"""
+        """Average pooling"""
         last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
         return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
 
     def get_detailed_instruct(self, task_description: str, query: str) -> str:
-        """构建详细指令"""
+        """Build detailed instruction"""
         return f'Instruct: {task_description}\nQuery: {query}'
 
     def chain_to_text(self, chain: List[str]) -> str:
-        """将定位链转换为文本表示"""
+        """Convert localization chain to text representation"""
         if not chain:
             return "empty_chain"
         
-        # 将entity ID列表转换为可读的文本描述
+        # Convert entity ID list to readable text description
         chain_parts = []
         for entity_id in chain:
-            # 提取文件名和实体名
+            # Extract file name and entity name
             if ':' in entity_id:
                 file_part, entity_part = entity_id.split(':', 1)
                 chain_parts.append(f"file:{file_part} entity:{entity_part}")
@@ -42,14 +42,14 @@ class LocalizationChainEmbedding:
     def compute_chain_embeddings(self, chains: List[List[str]], 
                                 task_description: str = None) -> Tensor:
         """
-        计算定位链的嵌入向量
+        Compute embeddings for localization chains
         
         Args:
-            chains: 定位链列表，每个定位链是entity ID的列表
-            task_description: 任务描述
+            chains: List of localization chains, each chain is a list of entity IDs
+            task_description: Task description
             
         Returns:
-            嵌入向量张量
+            Embedding tensor
         """
         if task_description is None:
             task_description = (
@@ -61,126 +61,112 @@ class LocalizationChainEmbedding:
                 "dependency relationships, or problem-solving approaches."
             )
         
-        # 将定位链转换为文本
+        # Convert localization chains to text
         chain_texts = []
         for i, chain in enumerate(chains):
             chain_text = self.chain_to_text(chain)
-            if i == 0:  # 第一个作为查询
+            if i == 0:  # First one as query
                 chain_texts.append(self.get_detailed_instruct(task_description, chain_text))
-            else:  # 其他作为文档
+            else:  # Others as documents
                 chain_texts.append(chain_text)
         
-        # 令牌化
+        # Tokenization
         batch_dict = self.tokenizer(chain_texts, max_length=1024, padding=True, 
                                    truncation=True, return_tensors='pt')
         
-        # 计算嵌入
+        # Compute embeddings
         with torch.no_grad():
             outputs = self.model(**batch_dict)
             embeddings = self.average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
         
-        # 标准化嵌入
+        # Normalize embeddings
         embeddings = F.normalize(embeddings, p=2, dim=1)
         return embeddings
 
     def select_diverse_chains(self, chains: List[List[str]], k: int = 4) -> Tuple[List[int], List[float]]:
         """
-        选择多样化的定位链（基于最长链）
+        Select diverse localization chains (based on longest chain)
         
         Args:
-            chains: 定位链列表
-            k: 选择的链数量（不包括最长链）
+            chains: List of localization chains
+            k: Number of chains to select (excluding the longest chain)
             
         Returns:
-            选中的链索引和相似度分数
+            Selected chain indices and similarity scores
         """
         if not chains:
             return [], []
         
-        # 1. 过滤空链并记录索引映射
         valid_chains = []
         valid_indices = []
         for i, chain in enumerate(chains):
-            if chain and len(chain) > 0:  # 过滤空链
+            if chain and len(chain) > 0:  
                 valid_chains.append(chain)
                 valid_indices.append(i)
         
         if not valid_chains:
-            logging.warning("所有定位链都为空")
+            logging.warning("All localization chains are empty")
             return [], []
         
-        logging.info(f"过滤空链后，有效定位链数量: {len(valid_chains)} (原始: {len(chains)})")
-        
-        # 2. 去重：使用字符串表示作为去重键
+        logging.info(f"After filtering empty chains, valid chain count: {len(valid_chains)} (original: {len(chains)})")
+
         unique_chains = []
         unique_indices = []
         seen_chains = set()
         
         for i, chain in enumerate(valid_chains):
-            # 将链转换为字符串作为去重键
             chain_key = str(sorted(chain)) if isinstance(chain, list) else str(chain)
             if chain_key not in seen_chains:
                 seen_chains.add(chain_key)
                 unique_chains.append(chain)
-                unique_indices.append(valid_indices[i])  # 映射回原始索引
+                unique_indices.append(valid_indices[i])  # Map back to original index
         
-        logging.info(f"去重后，唯一定位链数量: {len(unique_chains)} (过滤前: {len(valid_chains)})")
+        logging.info(f"After deduplication, unique chain count: {len(unique_chains)} (before filtering: {len(valid_chains)})")
         
         if not unique_chains:
-            logging.warning("去重后没有剩余的定位链")
+            logging.warning("No remaining localization chains after deduplication")
             return [], []
             
-        # 3. 找到最长的链
         chain_lengths = [len(chain) for chain in unique_chains]
         longest_idx_in_unique = chain_lengths.index(max(chain_lengths))
         longest_original_idx = unique_indices[longest_idx_in_unique]
         longest_chain = unique_chains[longest_idx_in_unique]
         
-        logging.info(f"最长定位链索引: {longest_original_idx} (原始), 长度: {len(longest_chain)}")
-        logging.info(f"最长定位链: {longest_chain}")
+        logging.info(f"Longest localization chain index: {longest_original_idx} (original), length: {len(longest_chain)}")
+        logging.info(f"Longest localization chain: {longest_chain}")
         
         if len(unique_chains) <= 1:
             return [longest_original_idx], [1.0]
         
-        # 4. 计算嵌入（最长链作为查询，其他作为候选）
         other_chains = [unique_chains[i] for i in range(len(unique_chains)) if i != longest_idx_in_unique]
         all_chains_for_embedding = [longest_chain] + other_chains
         embeddings = self.compute_chain_embeddings(all_chains_for_embedding)
         
-        # 5. 计算相似度分数
-        query_embedding = embeddings[0:1]  # 最长链的嵌入
-        doc_embeddings = embeddings[1:]    # 其他链的嵌入
+        query_embedding = embeddings[0:1]  
+        doc_embeddings = embeddings[1:]  
         
         similarities = (query_embedding @ doc_embeddings.T).squeeze().tolist()
-        if isinstance(similarities, float):  # 只有一个其他链的情况
+        if isinstance(similarities, float): 
             similarities = [similarities]
         
-        # 6. 创建索引映射（排除最长链的索引）
         other_original_indices = [unique_indices[i] for i in range(len(unique_chains)) if i != longest_idx_in_unique]
-        
-        # 7. 按相似度排序（最不相似的在前）
+
         indexed_similarities = list(zip(other_original_indices, similarities))
-        indexed_similarities.sort(key=lambda x: x[1])  # 升序排列，最不相似的在前
-        
-        # 8. 选择最不相似的k条链
-        selected_indices = [longest_original_idx]  # 总是包含最长链
-        selected_scores = [1.0]  # 最长链的"相似度"设为1.0
+        indexed_similarities.sort(key=lambda x: x[1])  
+
+        selected_indices = [longest_original_idx]  
+        selected_scores = [1.0]  
         
         for i, (chain_idx, similarity) in enumerate(indexed_similarities):
-            if len(selected_indices) >= k + 1:  # k条不相似的链 + 1条最长链
+            if len(selected_indices) >= k + 1:  
                 break
             selected_indices.append(chain_idx)
             selected_scores.append(similarity)
         
-        logging.info(f"选择的定位链索引: {selected_indices}")
-        logging.info(f"对应的相似度分数: {selected_scores}")
-        
         return selected_indices, selected_scores
 
-# 保持原有的screening函数以兼容性
 def screening(pre_issues: Dict, cur_issue: Dict,
               tokenizer=None, model=None, k=10):
-    """原有的issue筛选函数，保持兼容性"""
     if tokenizer is None:
         tokenizer = AutoTokenizer.from_pretrained("intfloat/multilingual-e5-large-instruct",
                                                  cache_dir='/home/workspace/models')

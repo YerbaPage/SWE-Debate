@@ -213,7 +213,7 @@ for output in tqdm(output_data):
         if found_entities_dict:
             for ntype, nids in found_entities_dict.items():
                 if not nids: continue
-                # class 和 function 逻辑一致(3个以内显示)
+                # class and function logic is consistent (show 3 or fewer)
                 if ntype in [NODE_TYPE_FUNCTION, NODE_TYPE_CLASS]:
                     identified_entities.extend(nids)
         if possible_line_numbers:

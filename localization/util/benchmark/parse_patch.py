@@ -114,7 +114,7 @@ def analyze_swe_dataset(dataset, max_edit_file_num=5, ignore_error=True, selecte
             file_num_dist[len(filenames)].append(data['instance_id'])
             repo_dist[data['repo']].append(data['instance_id'])
 
-            # 分出不同file下的patch，各自计算edit_lines/edit_ranges
+            # Separate patches for different files, calculate edit_lines/edit_ranges for each
             split_diffs = split_patch(data['patch'])
             patch_files = dict()
             for diff in split_diffs:

@@ -22,26 +22,26 @@ logger = logging.getLogger(__name__)
 
 
 def estimate_tokens(text: str) -> int:
-    """估算文本的token数量 (简单估算: 1 token ≈ 4个字符)"""
+    """Estimate the number of tokens in text (simple estimation: 1 token ≈ 4 characters)"""
     if not text:
         return 0
     return len(text) // 4
 
 
 def truncate_messages_if_needed(messages: list[dict], max_tokens: int = 60000) -> list[dict]:
-    """如果消息超过token限制，则截断消息列表
+    """Truncate message list if it exceeds token limit
     
     Args:
-        messages: 消息列表
-        max_tokens: 最大token数量限制
+        messages: Message list
+        max_tokens: Maximum token count limit
         
     Returns:
-        截断后的消息列表
+        Truncated message list
     """
     if not messages:
         return messages
         
-    # 计算总token数
+    # Calculate total token count
     total_tokens = sum(
         estimate_tokens(msg.get("content", ""))
         for msg in messages
@@ -50,13 +50,13 @@ def truncate_messages_if_needed(messages: list[dict], max_tokens: int = 60000) -
     if total_tokens <= max_tokens:
         return messages
         
-    logger.warning(f"消息总长度 {total_tokens} tokens 超过限制 {max_tokens} tokens，进行截断")
+    logger.warning(f"Total message length {total_tokens} tokens exceeds limit {max_tokens} tokens, truncating")
     
-    # 保留系统消息和最后几条消息
+    # Preserve system messages and last few messages
     result_messages = []
     remaining_tokens = max_tokens
     
-    # 首先保留系统消息
+    # First preserve system messages
     system_messages = [msg for msg in messages if msg.get("role") == "system"]
     for msg in system_messages:
         tokens = estimate_tokens(msg.get("content", ""))
@@ -64,10 +64,10 @@ def truncate_messages_if_needed(messages: list[dict], max_tokens: int = 60000) -
             result_messages.append(msg)
             remaining_tokens -= tokens
         else:
-            # 截断系统消息
+            # Truncate system message
             content = msg.get("content", "")
             max_chars = remaining_tokens * 4
-            truncated_content = content[:max_chars] + "...[截断]"
+            truncated_content = content[:max_chars] + "...[truncated]"
             result_messages.append({
                 "role": msg.get("role"),
                 "content": truncated_content
@@ -75,7 +75,7 @@ def truncate_messages_if_needed(messages: list[dict], max_tokens: int = 60000) -
             remaining_tokens = 0
             break
     
-    # 然后从后往前添加非系统消息
+    # Then add non-system messages from the end backwards
     non_system_messages = [msg for msg in messages if msg.get("role") != "system"]
     for msg in reversed(non_system_messages):
         tokens = estimate_tokens(msg.get("content", ""))
@@ -83,11 +83,11 @@ def truncate_messages_if_needed(messages: list[dict], max_tokens: int = 60000) -
             result_messages.insert(-len(system_messages) if system_messages else 0, msg)
             remaining_tokens -= tokens
         else:
-            # 如果还有剩余token，截断这条消息
-            if remaining_tokens > 100:  # 至少保留100个token
+            # If there are remaining tokens, truncate this message
+            if remaining_tokens > 100:  # Keep at least 100 tokens
                 content = msg.get("content", "")
                 max_chars = remaining_tokens * 4
-                truncated_content = content[:max_chars] + "...[截断]"
+                truncated_content = content[:max_chars] + "...[truncated]"
                 result_messages.insert(-len(system_messages) if system_messages else 0, {
                     "role": msg.get("role"),
                     "content": truncated_content
@@ -95,7 +95,7 @@ def truncate_messages_if_needed(messages: list[dict], max_tokens: int = 60000) -
             break
     
     final_tokens = sum(estimate_tokens(msg.get("content", "")) for msg in result_messages)
-    logger.info(f"消息截断完成: {total_tokens} -> {final_tokens} tokens")
+    logger.info(f"Message truncation completed: {total_tokens} -> {final_tokens} tokens")
     
     return result_messages
 
@@ -354,17 +354,17 @@ class CompletionModel(BaseModel):
         """
         litellm.drop_params = True
 
-        # 检查并截断消息以适应模型的上下文窗口
+        # Check and truncate messages to fit the model's context window
         if "deepseek" in self.model.lower():
-            # DeepSeek模型的上下文窗口是65536 tokens，保留一些余量
-            max_input_tokens = 60000  # 保留5536 tokens用于生成响应
+            # DeepSeek model has a context window of 65536 tokens, reserve some margin
+            max_input_tokens = 60000  # Reserve 5536 tokens for response generation
             messages = truncate_messages_if_needed(messages, max_input_tokens)
         elif "gpt-4" in self.model.lower():
-            # GPT-4模型的上下文窗口是8192 tokens
-            max_input_tokens = 6000  # 保留2192 tokens用于生成响应
+            # GPT-4 model has a context window of 8192 tokens
+            max_input_tokens = 6000  # Reserve 2192 tokens for response generation
             messages = truncate_messages_if_needed(messages, max_input_tokens)
         else:
-            # 其他模型使用默认限制
+            # Other models use default limits
             max_input_tokens = 60000
             messages = truncate_messages_if_needed(messages, max_input_tokens)
 
@@ -398,12 +398,12 @@ class CompletionModel(BaseModel):
             except Exception as e:
                 error_msg = str(e)
                 if "ContextWindowExceededError" in error_msg or "context length" in error_msg.lower():
-                    # 如果仍然超过上下文窗口，进行更激进的截断
-                    logger.warning(f"上下文窗口仍然超限，进行更激进的截断: {error_msg}")
+                    # If still exceeding context window, perform more aggressive truncation
+                    logger.warning(f"Context window still exceeded, performing more aggressive truncation: {error_msg}")
                     if "deepseek" in self.model.lower():
-                        messages = truncate_messages_if_needed(messages, 45000)  # 更保守的限制
+                        messages = truncate_messages_if_needed(messages, 45000)  # More conservative limit
                     else:
-                        messages = truncate_messages_if_needed(messages, 4000)   # 更保守的限制
+                        messages = truncate_messages_if_needed(messages, 4000)   # More conservative limit
                 raise e
 
         try:

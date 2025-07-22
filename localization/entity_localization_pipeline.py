@@ -26,7 +26,7 @@ from dependency_graph.build_graph import (
 from util.utils import convert_to_json
 from entity_embedding import LocalizationChainEmbedding
 
-# 从context中提取entity的prompt模板（复用entity_search_scorer.py中的ENTITY_EXTRACTION_PROMPT）
+# Extract the prompt template of the entity from the context (reuse ENTITY_EXTRACTION_PROMPT in entity_search_scorer.py)
 ENTITY_EXTRACTION_PROMPT = """
 You are a code analysis expert. Given an issue description, your task is to identify the most relevant code entities (classes, methods, functions, variables) that are likely involved in the issue.
 
@@ -77,7 +77,7 @@ Note: Return only the simple names like "__iter__", "page_range", "MyClass", "my
 Return exactly {max_entities} entities, prioritizing the most important ones if there are more candidates.
 """
 
-# 从代码片段中提取相关entity的prompt模板
+# A prompt template that extracts the relevant entity from a code snippet
 CODE_SNIPPET_ENTITY_EXTRACTION_PROMPT = """
 Based on the following code snippets and problem statement, identify the 4 most relevant entities (files, classes, or functions) that are likely involved in solving this issue.
 
@@ -147,7 +147,7 @@ Return a JSON list containing exactly 4 entities, each with the following format
 **Remember**: Maximize both relevance to the issue AND diversity across different files/modules to ensure comprehensive localization chain generation.
 """
 
-# 添加neighbor预筛选的prompt模板
+# Add prompt template for neighbor pre-screening
 NEIGHBOR_PREFILTERING_PROMPT = """
 You are a code analysis expert helping to select the most relevant and diverse neighbors for exploring a dependency graph to solve a specific issue.
 
@@ -194,7 +194,7 @@ Return a JSON object with your selection:
 Focus on strategic exploration that maximizes the chance of finding issue-relevant code while maintaining diversity.
 """
 
-# 节点选择的prompt模板
+# Node selection prompt template
 NODE_SELECTION_PROMPT = """
 You are a code analysis expert helping to navigate a dependency graph to solve a specific issue. Given the current context and available neighboring nodes, determine which node would be most promising to explore next.
 
@@ -234,7 +234,7 @@ If should_continue is false, set selected_neighbor to null.
 If should_continue is true, select the most promising neighbor_entity_id.
 """
 
-# 添加agent投票的prompt模板
+# Add prompt template for agent voting
 CHAIN_VOTING_PROMPT = """
 You are an expert software engineer tasked with identifying the optimal modification location for solving a specific software issue.
 
@@ -301,7 +301,7 @@ Return a JSON object with your vote:
 Remember: Focus on identifying where code changes should be made to fix the issue, not just which code is conceptually related.
 """
 
-# 添加第一轮修改位置判断的prompt模板
+# Add the prompt template for the first round of modification position judgment
 MODIFICATION_LOCATION_PROMPT = """
 You are an expert software engineer tasked with identifying specific code locations that need to be modified to solve a given issue.
 
@@ -354,7 +354,7 @@ Instead of: "Add proper termination condition"
 Provide: "Modify the __iter__ method in the Paginator class by adding a counter variable 'current_page = 1' at the beginning. Then add a while loop condition 'while current_page <= self.num_pages:' to replace the infinite loop. Inside the loop, yield 'self.page(current_page)' and increment 'current_page += 1'. Add try-catch block to handle PageNotAnInteger and EmptyPage exceptions by catching them and breaking the loop. Import the exceptions 'from django.core.paginator import PageNotAnInteger, EmptyPage' at the top of the file."
 """
 
-# 添加第二轮综合判断的prompt模板
+# Add prompt template for the second round of comprehensive judgment
 COMPREHENSIVE_MODIFICATION_PROMPT = """
 You are an expert software engineer participating in a collaborative code review process to determine the best approach for solving a software issue.
 
@@ -507,15 +507,15 @@ class EntityLocalizationPipeline:
         self.edge_types = [EDGE_TYPE_CONTAINS, EDGE_TYPE_IMPORTS, EDGE_TYPE_INVOKES, EDGE_TYPE_INHERITS]
         self.edge_directions = ['downstream', 'upstream']
 
-        # 初始化定位链嵌入计算器
+        # Initialize the positioning chain embedding calculator
         self.chain_embedding = LocalizationChainEmbedding()
         
-        # 缓存相关配置
+        # Cache related configuration
         self.cache_dir = "/entity_pipeline_cache"
         self.enable_cache = True
         self._ensure_cache_dir_exists()
         
-        # 初始化OpenAI客户端
+        # Initialize the OpenAI client
         self.client = OpenAI(
             base_url="",
             api_key="",
@@ -524,15 +524,15 @@ class EntityLocalizationPipeline:
 
     def _call_llm_simple(self, messages: List[Dict], temp: float = 0.1, max_tokens: int = 1000) -> str:
         """
-        简单的LLM调用函数，复用entity_search_scorer.py中的逻辑
+        Simple LLM call function, reusing the logic in entity_search_scorer.py
 
         Args:
-            messages: 消息列表
-            temp: 温度参数
-            max_tokens: 最大token数
+            messages: Message list
+            temp: Temperature parameter
+            max_tokens: Maximum token count
 
         Returns:
-            模型响应文本
+            Model response text
         """
         try:
             response = self.client.chat.completions.create(
@@ -544,7 +544,7 @@ class EntityLocalizationPipeline:
             )
             return response.choices[0].message.content
         except Exception as e:
-            logging.error(f"LLM调用失败: {e}")
+            logging.error(f"LLM call failed: {e}")
             raise e
 
     def run_pipeline(self, instance_data: Dict[str, Any], context: str, max_initial_entities: int = 5) -> str:
@@ -574,23 +574,23 @@ class EntityLocalizationPipeline:
         set_current_issue(instance_data=instance_data)
         logging.info("Current issue setup completed")
 
-        # 存储issue描述供LLM使用
+        # Store issue descriptions for use by LLM
         self._current_issue_description = instance_data['problem_statement']
         
-        # 生成缓存时间戳
+        # Generate cache timestamp
         cache_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         instance_id = instance_data.get('instance_id', 'unknown')
         
-        logging.info(f"缓存时间戳: {cache_timestamp}")
+        logging.info(f"cache timestamp: {cache_timestamp}")
 
         try:
             # Stage 1: Extract initial entities from context
-            logging.info("开始阶段1: 从context中提取初始entities")
+            logging.info("Starting Stage 1: Extracting initial entities from context")
             initial_entities = self._extract_initial_entities(context, instance_data['problem_statement'],
                                                               max_initial_entities)
-            logging.info(f"阶段1完成，提取到 {len(initial_entities)} 个初始entities: {initial_entities}")
-            
-            # 保存Stage 1结果
+            logging.info(f"Stage 1 completed, extracted {len(initial_entities)} initial entities: {initial_entities}")
+
+            # Save Stage 1 results
             stage1_data = {
                 'initial_entities': initial_entities,
                 'context': context,
@@ -601,7 +601,7 @@ class EntityLocalizationPipeline:
             self._save_stage_result(instance_id, 'stage_1_initial_entities', stage1_data, cache_timestamp)
 
             if not initial_entities:
-                logging.warning("未提取到任何初始entities，流程结束")
+                logging.warning("No initial entities were extracted, the process ends")
                 return {
                     'instance_id': instance_data['instance_id'],
                     'context': context,
@@ -618,10 +618,10 @@ class EntityLocalizationPipeline:
                 }
 
             # Stage 2: For each initial entity, search code snippets and extract related entities
-            logging.info("开始阶段2: 为每个初始entity搜索相关entities")
+            logging.info("Start phase 2: Search for related entities for each initial entity")
             entity_groups = []
             for i, initial_entity in enumerate(initial_entities):
-                logging.info(f"处理初始entity {i + 1}/{len(initial_entities)}: '{initial_entity}'")
+                logging.info(f"Processing initial entity {i + 1}/{len(initial_entities)}: '{initial_entity}'")
                 related_entities = self._extract_related_entities_for_initial_entity(
                     initial_entity, instance_data['problem_statement']
                 )
@@ -629,30 +629,30 @@ class EntityLocalizationPipeline:
                     'initial_entity': initial_entity,
                     'related_entities': related_entities
                 })
-                logging.info(f"为 '{initial_entity}' 找到 {len(related_entities)} 个相关entities")
+                logging.info(f"for '{initial_entity}' find {len(related_entities)} related entities")
 
             total_related_entities = sum(len(group['related_entities']) for group in entity_groups)
-            logging.info(f"阶段2完成，总共找到 {total_related_entities} 个相关entities")
-            
-            # 保存Stage 2结果
+            logging.info(f"Phase 2 completed, a total of {total_related_entities} related entities found")
+
+            # Save Stage 2 results
             stage2_data = {
                 'entity_groups': entity_groups,
                 'total_related_entities': total_related_entities
             }
             self._save_stage_result(instance_id, 'stage_2_related_entities', stage2_data, cache_timestamp)
 
-            # Stage 3: Generate localization chains for each related entity, grouped by initial entity (并行版本)
-            logging.info("开始阶段3: 为相关entities生成定位链 (并行处理)")
+            # Stage 3: Generate localization chains for each related entity, grouped by initial entity 
+            logging.info("Start phase 3: Generate location chains for related entities (parallel processing)")
             grouped_localization_chains = []
-            all_chains = []  # 收集所有定位链用于后续选择
+            all_chains = []  # Collect all positioning chains for subsequent selection
             total_chains_generated = 0
             results_lock = threading.Lock()
 
             def process_group_worker(group_index: int, group: Dict[str, Any]) -> Dict[str, Any]:
-                """单个group的定位链生成工作函数"""
+                """A single group's positioning chain generates a working function"""
                 initial_entity = group['initial_entity']
-                logging.info(f"开始处理group {group_index + 1}/{len(entity_groups)} - 初始entity: '{initial_entity}'")
-                
+                logging.info(f"Start processing group {group_index + 1}/{len(entity_groups)} - Initial entity: '{initial_entity}'")
+
                 try:
                     localization_chains = self._generate_localization_chains(group['related_entities'])
                     
@@ -663,8 +663,8 @@ class EntityLocalizationPipeline:
                         'chain_count': len(localization_chains),
                         'group_index': group_index
                     }
-                    
-                    # 收集该group的有效定位链
+
+                    # Collect valid positioning chains for this group
                     group_valid_chains = []
                     for chain_info in localization_chains:
                         if chain_info.get('chain') and len(chain_info['chain']) > 0:
@@ -676,12 +676,12 @@ class EntityLocalizationPipeline:
                             })
                     
                     group_result['valid_chains'] = group_valid_chains
-                    
-                    logging.info(f"Group {group_index + 1} ('{initial_entity}') 处理完成，生成了 {len(localization_chains)} 条定位链")
+
+                    logging.info(f"Group {group_index + 1} ('{initial_entity}') processing completed, generated {len(localization_chains)} positioning chains")
                     return group_result
                     
                 except Exception as e:
-                    logging.error(f"Group {group_index + 1} ('{initial_entity}') 处理失败: {e}")
+                    logging.error(f"Group {group_index + 1} ('{initial_entity}') processing failed: {e}")
                     return {
                         'initial_entity': initial_entity,
                         'related_entities': group['related_entities'],
@@ -692,18 +692,16 @@ class EntityLocalizationPipeline:
                         'error': str(e)
                     }
 
-            # 使用线程池并行处理所有groups
-            max_workers = min(len(entity_groups), 5)  # 限制并发数避免过度占用资源
-            logging.info(f"启动 {max_workers} 个工作线程进行并行group处理")
+            # Use a thread pool to process all groups in parallel
+            max_workers = min(len(entity_groups), 5)  # Limit the number of concurrent connections to avoid excessive resource usage
+            logging.info(f"Start {max_workers} worker threads for parallel group processing")
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # 提交所有group的处理任务
                 futures = [
                     executor.submit(process_group_worker, i, group)
                     for i, group in enumerate(entity_groups)
                 ]
 
-                # 收集完成的结果
                 completed_results = []
                 for future in as_completed(futures):
                     try:
@@ -711,14 +709,11 @@ class EntityLocalizationPipeline:
                         with results_lock:
                             completed_results.append(group_result)
                     except Exception as e:
-                        logging.error(f"Group处理线程异常: {e}")
+                        logging.error(f"Group processing thread exception: {e}")
 
-            # 按原始顺序排序结果
             completed_results.sort(key=lambda x: x['group_index'])
             
-            # 构建最终结果
             for group_result in completed_results:
-                # 移除辅助字段，保持原有格式
                 final_group_result = {
                     'initial_entity': group_result['initial_entity'],
                     'related_entities': group_result['related_entities'],
@@ -727,15 +722,12 @@ class EntityLocalizationPipeline:
                 }
                 grouped_localization_chains.append(final_group_result)
                 
-                # 收集所有有效的定位链
                 all_chains.extend(group_result.get('valid_chains', []))
                 total_chains_generated += group_result['chain_count']
 
-            logging.info(f"阶段3并行处理完成，总共生成 {total_chains_generated} 条定位链")
             for i, chain in enumerate(all_chains, 1):
                 logging.info("Chain %d: %s", i, chain)
             
-            # 保存Stage 3结果
             stage3_data = {
                 'grouped_localization_chains': grouped_localization_chains,
                 'all_chains': all_chains,
@@ -743,36 +735,32 @@ class EntityLocalizationPipeline:
             }
             self._save_stage_result(instance_id, 'stage_3_localization_chains', stage3_data, cache_timestamp)
 
-            # Stage 4: 使用embedding选择多样化的定位链
-            logging.info("开始阶段4: 使用embedding选择多样化的定位链")
+            # Stage 4: Use embedding to select diverse localization chains
             selected_chains = self._select_diverse_chains(all_chains)
-            
-            # 保存Stage 4结果
+
+            # Save Stage 4 results
             stage4_data = {
                 'selected_chains': selected_chains,
                 'selected_chains_count': len(selected_chains)
             }
             self._save_stage_result(instance_id, 'stage_4_diverse_chains', stage4_data, cache_timestamp)
 
-            # Stage 5: 为选择的定位链添加代码信息
-            logging.info("开始阶段5: 为选择的定位链添加代码信息")
+            # Stage 5: Add code information to the selected positioning chain
             chains_with_code = self._add_code_to_chains(selected_chains)
             
-            # 保存Stage 5结果
             stage5_data = {
                 'chains_with_code': chains_with_code,
                 'chains_with_code_count': len(chains_with_code)
             }
             self._save_stage_result(instance_id, 'stage_5_chains_with_code', stage5_data, cache_timestamp)
 
-            # Stage 6: 使用多个agent对定位链进行投票
-            logging.info("开始阶段6: 使用多个agent对定位链进行投票")
+            # Stage 6: Use multiple agents to vote on the localization chains
             voting_result = self._vote_on_chains(chains_with_code, instance_data['problem_statement'])
-            
-            # 保存Stage 6结果（包括winning chain的信息）
+
+            # Save Stage 6 results (including winning chain information)
             stage6_data = {
                 'voting_result': voting_result,
-                'chains_with_code': chains_with_code,  # 保存用于投票的链信息
+                'chains_with_code': chains_with_code,  
                 'winning_chain': voting_result.get('winning_chain'),
                 'winning_chain_id': voting_result.get('winning_chain_id')
             }
@@ -781,8 +769,7 @@ class EntityLocalizationPipeline:
             if not voting_result.get('success') or not voting_result.get('winning_chain'):
                 return self._create_error_result(instance_data, context, 'No winning chain found')
 
-            # Stage 7: 多轮agent讨论生成修改plan
-            logging.info("开始阶段7: 多轮agent讨论生成修改plan")
+            # Stage 7: Use multi-turn agent discussion to generate modification plan
             modification_plan = self._generate_modification_plan(
                 voting_result['winning_chain'],
                 instance_data['problem_statement'],
@@ -791,15 +778,13 @@ class EntityLocalizationPipeline:
                 cache_timestamp
             )
 
-            # Stage 8: 格式化输出给edit agent的信息
-            logging.info("开始阶段8: 格式化输出给edit agent的信息")
+            # Stage 8: Format output for edit agent
             edit_agent_prompt = self._format_edit_agent_prompt(
                 instance_data['problem_statement'],
                 modification_plan,
                 voting_result['winning_chain']
             )
             
-            # 保存Stage 8结果
             stage8_data = {
                 'edit_agent_prompt': edit_agent_prompt,
                 'modification_plan': modification_plan,
@@ -817,7 +802,7 @@ class EntityLocalizationPipeline:
                 'voting_result': voting_result,
                 'final_selected_chain': voting_result.get('winning_chain'),
                 'modification_plan': modification_plan,
-                'edit_agent_prompt': edit_agent_prompt,  # 新添加的格式化输出
+                'edit_agent_prompt': edit_agent_prompt,  
                 'total_chains': len(all_chains),
                 'metadata': {
                     'repo': instance_data['repo'],
@@ -827,14 +812,7 @@ class EntityLocalizationPipeline:
             }
 
             logging.info("=" * 80)
-            logging.info("=== Entity Localization Pipeline 完成 ===")
-            logging.info(f"最终结果汇总:")
-            logging.info(f"  - 初始entities: {len(initial_entities)}")
-            logging.info(f"  - 总定位链数: {len(all_chains)}")
-            logging.info(f"  - 选择的定位链数: {len(selected_chains)}")
-            logging.info(f"  - 最终获胜链: {voting_result.get('winning_chain_id', 'None')}")
-            logging.info(f"  - 修改plan步骤数: {len(modification_plan.get('final_plan', {}).get('modifications', []))}")
-            logging.info(f"  - edit agent prompt长度: {len(edit_agent_prompt)}")
+            logging.info("=== Entity Localization Pipeline completed ===")
             logging.info("=" * 80)
 
             # return result
@@ -846,7 +824,6 @@ class EntityLocalizationPipeline:
             logging.info("Current issue cleanup completed")
 
     def _create_error_result(self, instance_data: Dict[str, Any], context: str, error_msg: str) -> Dict[str, Any]:
-        """创建错误结果"""
         return {
             'instance_id': instance_data['instance_id'],
             'context': context,
@@ -875,9 +852,6 @@ class EntityLocalizationPipeline:
             List of initial entity names (limited to max_entities)
         """
         logging.info("=== Stage 1: Extracting Initial Entities from Context ===")
-        logging.info(f"输入context长度: {len(context)}")
-        logging.info(f"输入issue描述长度: {len(issue_description)}")
-        logging.info(f"最大entity数量: {max_entities}")
 
         prompt = ENTITY_EXTRACTION_PROMPT.format(
             context=context,
@@ -885,48 +859,39 @@ class EntityLocalizationPipeline:
             max_entities=max_entities
         )
 
-        logging.info(f"构建的entity提取prompt长度: {len(prompt)}")
         messages = [{"role": "user", "content": prompt}]
 
         try:
-            logging.info("调用LLM进行初始entity提取...")
             response = self._call_llm_simple(
                 messages=messages,
                 temp=0.7,
                 max_tokens=1000
             )
 
-            logging.info(f"LLM响应长度: {len(response)}")
-            logging.info(f"LLM原始响应: {response[:300]}...")
-
-            # 解析JSON响应
+            # Parsing JSON Response
             response_text = response.strip()
             if response_text.startswith('```json'):
                 response_text = response_text[7:]
-                logging.info("移除了开头的```json标记")
+                logging.info("Removed opening ```json tag")
             if response_text.endswith('```'):
                 response_text = response_text[:-3]
-                logging.info("移除了结尾的```标记")
+                logging.info("Removed closing ``` tag")
 
-            logging.info(f"清理后的响应: {response_text}")
+            logging.info(f"Cleaned response: {response_text}")
             entities = json.loads(response_text)
 
-            # 验证返回的是列表且包含字符串，并确保数量符合要求
             if isinstance(entities, list) and all(isinstance(entity, str) for entity in entities):
-                # 确保数量不超过max_entities（模型可能返回少于max_entities的数量）
                 entities = entities[:max_entities]
-                logging.info(f"成功解析JSON，提取到 {len(entities)} 个entities (要求最多{max_entities}个)")
-                logging.info(f"成功提取初始entities: {entities}")
                 return entities
             else:
-                logging.warning(f"大模型返回格式不正确，返回类型: {type(entities)}")
+                logging.warning(f"The large model return format is incorrect, the return type: {type(entities)}")
                 return []
 
         except json.JSONDecodeError as e:
-            logging.error(f"JSON解析失败: {e}，原始响应: {response}")
+            logging.error(f"JSON parsing failed: {e}, original response: {response}")
             return []
         except Exception as e:
-            logging.error(f"初始entity提取失败: {e}")
+            logging.error(f"Initial entity extraction failed: {e}")
             return []
 
     def _extract_related_entities_for_initial_entity(self, initial_entity: str, problem_statement: str) -> List[
@@ -944,25 +909,22 @@ class EntityLocalizationPipeline:
         logging.info(f"=== Stage 2: Extracting Related Entities for '{initial_entity}' ===")
 
         # Search for code snippets containing this entity
-        logging.info(f"开始搜索包含 '{initial_entity}' 的代码片段...")
         code_snippets = self._search_code_snippets_for_entity(initial_entity)
 
         if not code_snippets or len(code_snippets.strip()) == 0:
             logging.warning(f"No code snippets found for entity '{initial_entity}'")
             return []
 
-        logging.info(f"找到代码片段，长度: {len(code_snippets)}")
-
         # Extract 4 related entities from the code snippets
-        logging.info(f"从代码片段中提取相关entities...")
+        logging.info(f"Extracting related entities from code snippets...")
         related_entities = self._extract_entities_from_code_snippets(code_snippets, problem_statement)
 
         logging.info(f"Found {len(related_entities)} related entities for '{initial_entity}'")
         for i, entity in enumerate(related_entities):
             logging.info(
-                f"  相关entity {i + 1}: {entity.get('entity_id', 'unknown')} ({entity.get('entity_type', 'unknown')})"
+                f"entity {i + 1}: {entity.get('entity_id', 'unknown')} ({entity.get('entity_type', 'unknown')})"
             )
-            logging.info(f"    原因: {entity.get('relevance_reason', 'No reason provided')}")
+            logging.info(f"reason: {entity.get('relevance_reason', 'No reason provided')}")
 
         return related_entities
 
@@ -989,18 +951,18 @@ class EntityLocalizationPipeline:
         ]
         search_terms.extend(variations)
 
-        logging.info(f"搜索词列表: {search_terms}")
+        logging.info(f"Search word list: {search_terms}")
 
         # Search for code snippets
-        logging.info("调用search_code_snippets进行搜索...")
+        logging.info("Call search_code_snippets to search...")
         code_snippets = search_code_snippets(
             search_terms=search_terms,
             file_path_or_pattern="**/*.py"
         )
 
-        logging.info(f"搜索完成，找到代码片段长度: {len(code_snippets)}")
+        logging.info(f"Search completed, find the length of the code snippet: {len(code_snippets)}")
         if code_snippets:
-            logging.info(f"代码片段预览: {code_snippets[:200]}...")
+            logging.info(f"Code snippet preview: {code_snippets[:200]}...")
 
         return code_snippets
 
@@ -1015,14 +977,14 @@ class EntityLocalizationPipeline:
         Returns:
             List of extracted entities with their metadata
         """
-        logging.info("开始从代码片段中提取entities...")
+        logging.info("Start extracting entities from code snippets...")
 
         prompt = CODE_SNIPPET_ENTITY_EXTRACTION_PROMPT.format(
             code_snippets=code_snippets,
             problem_statement=problem_statement
         )
 
-        logging.info(f"构建的entity提取prompt长度: {len(prompt)}")
+        logging.info(f"The length of the constructed entity extraction prompt: {len(prompt)}")
 
         messages = [
             {
@@ -1036,7 +998,7 @@ class EntityLocalizationPipeline:
         ]
 
         try:
-            logging.info("调用LLM进行entity提取...")
+            logging.info("Call LLM to extract entity...")
             response = self.client.chat.completions.create(
                 model="deepseek-v3",
                 messages=messages,
@@ -1044,12 +1006,10 @@ class EntityLocalizationPipeline:
             )
 
             entities_text = response.choices[0].message.content
-            logging.info(f"LLM响应长度: {len(entities_text)}")
-            logging.info(f"LLM原始响应: {entities_text[:300]}...")
 
             entities = self._parse_extracted_entities(entities_text)
 
-            logging.info(f"成功提取 {len(entities)} 个entities from code snippets")
+            logging.info(f"Successfully extracted {len(entities)} entities from code snippets")
             return entities
 
         except Exception as e:
@@ -1058,14 +1018,13 @@ class EntityLocalizationPipeline:
 
     def _parse_extracted_entities(self, entities_text: str) -> List[Dict[str, Any]]:
         """Parse extracted entities from LLM response."""
-        logging.info("开始解析LLM返回的entities...")
+        logging.info("Start parsing the entities returned by LLM...")
         try:
             # Try to extract JSON from the response
             import re
             json_match = re.search(r'\[.*?\]', entities_text, re.DOTALL)
             if json_match:
                 entities_json = json_match.group()
-                logging.info(f"提取到JSON字符串: {entities_json[:200]}...")
                 entities = json.loads(entities_json)
 
                 # Validate and clean entities
@@ -1073,16 +1032,16 @@ class EntityLocalizationPipeline:
                 for i, entity in enumerate(entities[:4]):  # Ensure max 4 entities
                     if 'entity_id' in entity and 'entity_type' in entity:
                         validated_entities.append(entity)
-                        logging.info(f"验证entity {i + 1}: {entity['entity_id']} ({entity['entity_type']})")
+                        logging.info(f"Verify entity {i + 1}: {entity['entity_id']} ({entity['entity_type']})")
                     else:
-                        logging.warning(f"跳过无效entity {i + 1}: {entity}")
+                        logging.warning(f"Skip invalid entity {i + 1}: {entity}")
 
-                logging.info(f"验证完成，有效entities: {len(validated_entities)}")
+                logging.info(f"Validation complete, valid entities: {len(validated_entities)}")
                 return validated_entities
             else:
-                logging.warning("在响应中未找到JSON格式数据")
+                logging.warning("No JSON format data found in response")
         except json.JSONDecodeError as e:
-            logging.error(f"JSON解析失败: {e}")
+            logging.error(f"JSON parsing failed: {e}")
         except Exception as e:
             logging.error(f"Failed to parse entities: {e}")
 
@@ -1091,51 +1050,48 @@ class EntityLocalizationPipeline:
     def _select_next_node_with_llm(self, current_entity: str, neighbors: List[str],
                                    issue_description: str, entity_searcher, depth: int) -> Dict[str, Any]:
         """
-        使用LLM选择下一个最有希望的探索节点
+        Use LLM to select the next most promising node for exploration
 
         Args:
-            current_entity: 当前实体ID
-            neighbors: 邻居节点列表
-            issue_description: 问题描述
-            entity_searcher: 实体搜索器
-            depth: 当前深度
+            current_entity: Current entity ID
+            neighbors: List of neighbor node IDs
+            issue_description: Issue description
+            entity_searcher: Entity searcher
+            depth: Current depth
 
         Returns:
-            包含选择决策的字典
+            A dictionary containing the selection decision
         """
-        logging.info(f"使用LLM选择下一个节点，当前entity: {current_entity}, 深度: {depth}, 邻居数量: {len(neighbors)}")
+        logging.info(f"Use LLM to select the next node, current entity: {current_entity}, depth: {depth}, number of neighbors: {len(neighbors)}")
 
         if not neighbors:
-            logging.info("没有可用邻居，停止探索")
+            logging.info("No available neighbors, stopping exploration")
             return {"should_continue": False, "selected_neighbor": None, "reasoning": "No neighbors available"}
 
         try:
-            # 获取当前实体信息
             current_entity_data = entity_searcher.get_node_data([current_entity])[0]
             current_entity_type = current_entity_data['type']
 
-            logging.info(f"当前实体类型: {current_entity_type}")
+            logging.info(f"Current entity type: {current_entity_type}")
 
-            # 构建邻居信息
             neighbor_info_list = []
-            for i, neighbor in enumerate(neighbors[:10]):  # 限制最多10个邻居避免prompt过长
+            for i, neighbor in enumerate(neighbors[:10]):  
                 try:
                     neighbor_data = entity_searcher.get_node_data([neighbor])[0]
                     neighbor_info = f"- {neighbor} (Type: {neighbor_data['type']})"
-                    # 如果有代码信息，添加简短描述
                     if 'code' in neighbor_data and neighbor_data['code']:
-                        code_preview = neighbor_data['code'][:200] + "..." if len(neighbor_data['code']) > 200 else \
+                        code_preview = neighbor_data['code'][:500] + "..." if len(neighbor_data['code']) > 500 else \
                             neighbor_data['code']
                         neighbor_info += f"\n  Code preview: {code_preview}"
                     neighbor_info_list.append(neighbor_info)
-                    logging.info(f"  邻居 {i + 1}: {neighbor} ({neighbor_data['type']})")
+                    logging.info(f" {i + 1}: {neighbor} ({neighbor_data['type']})")
                 except:
                     neighbor_info_list.append(f"- {neighbor} (Type: unknown)")
-                    logging.warning(f"  邻居 {i + 1}: {neighbor} (获取信息失败)")
+                    logging.warning(f"Neighbor {i + 1}: {neighbor} (failed to get information)")
 
             neighbor_info = "\n".join(neighbor_info_list)
 
-            # 构建prompt
+            # Build prompt
             prompt = NODE_SELECTION_PROMPT.format(
                 issue_description=issue_description,
                 current_entity=current_entity,
@@ -1144,19 +1100,16 @@ class EntityLocalizationPipeline:
                 neighbor_info=neighbor_info
             )
 
-            logging.info(f"构建的节点选择prompt长度: {len(prompt)}")
+            logging.info(f"The length of the constructed node selection prompt: {len(prompt)}")
             messages = [{"role": "user", "content": prompt}]
 
-            logging.info("调用LLM进行节点选择...")
+            logging.info("Calling LLM for node selection...")
             response = self._call_llm_simple(
                 messages=messages,
                 temp=0.7,
                 max_tokens=1000
             )
 
-            logging.info(f"LLM节点选择响应: {response[:200]}...")
-
-            # 解析JSON响应
             response_text = response.strip()
             if response_text.startswith('```json'):
                 response_text = response_text[7:]
@@ -1165,51 +1118,47 @@ class EntityLocalizationPipeline:
 
             decision = json.loads(response_text)
 
-            # 验证响应格式
             if isinstance(decision, dict) and 'should_continue' in decision:
                 should_continue = decision.get('should_continue', False)
                 selected_neighbor = decision.get('selected_neighbor')
                 reasoning = decision.get('reasoning', 'No reasoning provided')
-                logging.info(f"LLM决策: 继续探索={should_continue}, 选中邻居={selected_neighbor}")
-                logging.info(f"LLM推理: {reasoning}")
+                logging.info(f"LLM decision: continue exploration={should_continue}, selected neighbor={selected_neighbor}")
+                logging.info(f"LLM reasoning: {reasoning}")
                 return decision
             else:
-                logging.warning("LLM返回格式不正确，使用fallback逻辑")
+                logging.warning("LLM response format is incorrect, using fallback logic")
                 return self._fallback_node_selection(current_entity, neighbors, entity_searcher, depth)
 
         except Exception as e:
-            logging.error(f"LLM节点选择失败: {e}，使用fallback逻辑")
+            logging.error(f"LLM node selection failed: {e}, using fallback logic")
             return self._fallback_node_selection(current_entity, neighbors, entity_searcher, depth)
 
     def _prefilter_neighbors_with_llm(self, current_entity: str, all_neighbors: List[Dict],
                                       issue_description: str, entity_searcher, depth: int,
                                       max_selection: int = 10) -> List[str]:
         """
-        使用LLM预筛选neighbors，选出最相关和多样化的邻居实体
+        Use LLM to pre-screen neighbors and select the most relevant and diverse neighbor entities
 
         Args:
-            current_entity: 当前实体ID
-            all_neighbors: 所有邻居实体信息列表
-            issue_description: 问题描述
-            entity_searcher: 实体搜索器
-            depth: 当前深度
-            max_selection: 最大选择数量
+            current_entity: Current entity ID
+            all_neighbors: List of all neighbor entity information
+            issue_description: Issue description
+            entity_searcher: Entity searcher
+            depth: Current depth
+            max_selection: Maximum selection count
 
         Returns:
-            筛选后的邻居实体ID列表
+            List of filtered neighbor entity IDs
         """
         if len(all_neighbors) <= max_selection:
-            # 如果邻居数量不超过最大选择数，直接返回所有邻居
             return [n['entity_id'] for n in all_neighbors]
 
-        logging.info(f"开始预筛选neighbors，总数: {len(all_neighbors)}, 目标选择: {max_selection}")
+        logging.info(f"Start pre-screening neighbors, total: {len(all_neighbors)}, target selection: {max_selection}")
 
         try:
-            # 获取当前实体信息
             current_entity_data = entity_searcher.get_node_data([current_entity])[0]
             current_entity_type = current_entity_data['type']
 
-            # 构建邻居列表信息（只包含entity ID和基本类型信息）
             neighbor_list_parts = []
             for i, neighbor_info in enumerate(all_neighbors):
                 neighbor_id = neighbor_info['entity_id']
@@ -1229,7 +1178,6 @@ class EntityLocalizationPipeline:
 
             neighbor_list = "\n".join(neighbor_list_parts)
 
-            # 构建预筛选prompt
             prompt = NEIGHBOR_PREFILTERING_PROMPT.format(
                 issue_description=issue_description,
                 current_entity=current_entity,
@@ -1240,19 +1188,15 @@ class EntityLocalizationPipeline:
                 max_selection=max_selection
             )
 
-            logging.info(f"构建的neighbor预筛选prompt长度: {len(prompt)}")
+            logging.info(f"The length of the neighbor pre-screening prompt constructed: {len(prompt)}")
             messages = [{"role": "user", "content": prompt}]
 
-            logging.info("调用LLM进行neighbor预筛选...")
             response = self._call_llm_simple(
                 messages=messages,
                 temp=0.7,
                 max_tokens=1000
             )
 
-            logging.info(f"LLM预筛选响应: {response[:200]}...")
-
-            # 解析JSON响应
             response_text = response.strip()
             if response_text.startswith('```json'):
                 response_text = response_text[7:]
@@ -1261,51 +1205,47 @@ class EntityLocalizationPipeline:
 
             selection_result = json.loads(response_text)
 
-            # 验证响应格式并提取选中的邻居
             if isinstance(selection_result, dict) and 'selected_neighbors' in selection_result:
                 selected_neighbors = selection_result['selected_neighbors']
                 reasoning = selection_result.get('selection_reasoning', 'No reasoning provided')
                 diversity = selection_result.get('diversity_considerations', 'No diversity info')
 
-                # 验证选中的邻居是否都在原始列表中
                 available_neighbor_ids = [n['entity_id'] for n in all_neighbors]
                 valid_selected = [n for n in selected_neighbors if n in available_neighbor_ids]
 
-                logging.info(f"LLM选择了 {len(valid_selected)} 个neighbors")
-                logging.info(f"选择原因: {reasoning}")
-                logging.info(f"多样性考虑: {diversity}")
-                logging.info(f"选中的neighbors: {valid_selected}")
+                logging.info(f"LLM selected {len(valid_selected)} neighbors")
+                logging.info(f"Selection reasoning: {reasoning}")
+                logging.info(f"Diversity considerations: {diversity}")
+                logging.info(f"Selected neighbors: {valid_selected}")
 
                 return valid_selected
             else:
-                logging.warning("LLM预筛选返回格式不正确，使用fallback策略")
+                logging.warning("LLM pre-screening returned invalid format, using fallback strategy")
                 return self._fallback_neighbor_prefiltering(all_neighbors, max_selection)
 
         except Exception as e:
-            logging.error(f"LLM neighbor预筛选失败: {e}，使用fallback策略")
+            logging.error(f"LLM neighbor pre-screening failed: {e}, using fallback strategy")
             return self._fallback_neighbor_prefiltering(all_neighbors, max_selection)
 
     def _fallback_neighbor_prefiltering(self, all_neighbors: List[Dict], max_selection: int) -> List[str]:
         """
-        Fallback neighbor预筛选策略
+        Fallback neighbor pre-screening strategy
 
         Args:
-            all_neighbors: 所有邻居实体信息列表
-            max_selection: 最大选择数量
+            all_neighbors: List of all neighbor entity information
+            max_selection: Maximum number of selections
 
         Returns:
-            筛选后的邻居实体ID列表
+            Filtered neighbor entity ID list
         """
-        logging.info("使用fallback neighbor预筛选策略")
+        logging.info("Using fallback neighbor pre-screening strategy")
 
-        # 简单策略：尽量选择不同文件的entities，优先选择functions和classes
+        #logging.info("Use fallback neighbor pre-screening strategy")
         selected = []
         seen_files = set()
 
-        # 按优先级排序：function > class > file
         type_priority = {'function': 0, 'class': 1, 'file': 2}
 
-        # 首先尝试选择不同文件的entities
         for neighbor_info in all_neighbors:
             if len(selected) >= max_selection:
                 break
@@ -1313,12 +1253,10 @@ class EntityLocalizationPipeline:
             neighbor_id = neighbor_info['entity_id']
             file_path = neighbor_id.split(':')[0] if ':' in neighbor_id else neighbor_id
 
-            # 如果是新文件，优先选择
             if file_path not in seen_files:
                 selected.append(neighbor_id)
                 seen_files.add(file_path)
 
-        # 如果还没有达到最大数量，继续选择剩余的
         for neighbor_info in all_neighbors:
             if len(selected) >= max_selection:
                 break
@@ -1327,7 +1265,6 @@ class EntityLocalizationPipeline:
             if neighbor_id not in selected:
                 selected.append(neighbor_id)
 
-        logging.info(f"Fallback策略选择了 {len(selected)} 个neighbors: {selected}")
         return selected
 
     def _dfs_traversal(self, start_entity: str, graph, entity_searcher, dependency_searcher,
@@ -1345,7 +1282,7 @@ class EntityLocalizationPipeline:
         Returns:
             Simplified localization chain as list of entity IDs only
         """
-        logging.info(f"开始DFS遍历，起始entity: {start_entity}, 最大深度: {max_depth}")
+        logging.info(f"Start DFS traversal, starting entity: {start_entity}, maximum depth: {max_depth}")
 
         visited = set()
         best_chain = []
@@ -1360,13 +1297,13 @@ class EntityLocalizationPipeline:
             """
             nonlocal best_chain
 
-            logging.info(f"DFS访问节点: {current_entity}, 深度: {depth}, 路径长度: {len(current_path)}")
+            logging.info(f"DFS visiting node: {current_entity}, depth: {depth}, path length: {len(current_path)}")
 
             if depth >= max_depth or current_entity in visited:
                 if depth >= max_depth:
-                    logging.info(f"达到最大深度 {max_depth}，停止探索")
+                    logging.info(f"Reached maximum depth {max_depth}, stopping exploration")
                 if current_entity in visited:
-                    logging.info(f"节点 {current_entity} 已访问过，跳过")
+                    logging.info(f"Node {current_entity} has been visited, skipping")
                 return False
 
             visited.add(current_entity)
@@ -1374,7 +1311,6 @@ class EntityLocalizationPipeline:
             # Add current step to path - only save entity_id
             current_path.append(current_entity)
 
-            # 收集所有可用的邻居
             all_neighbors = []
             for direction in self.edge_directions:
                 for edge_type in self.edge_types:
@@ -1400,67 +1336,48 @@ class EntityLocalizationPipeline:
                         logging.debug(f"Error exploring {direction} {edge_type} from {current_entity}: {e}")
                         continue
 
-            logging.info(f"找到 {len(all_neighbors)} 个未访问的邻居")
-
-            # 如果没有未访问的邻居，这是一个端点
             if not all_neighbors:
                 if len(current_path) > len(best_chain):
                     best_chain = current_path.copy()
-                    logging.info(f"更新最佳路径，长度: {len(best_chain)}")
                 return True
 
-            # 步骤1：使用LLM预筛选neighbors（如果邻居太多）
             if len(all_neighbors) > 10:
-                logging.info(f"邻居数量({len(all_neighbors)})超过10，开始预筛选")
                 prefiltered_neighbors = self._prefilter_neighbors_with_llm(
                     current_entity, all_neighbors, issue_description, entity_searcher, depth, max_selection=10
                 )
             else:
                 prefiltered_neighbors = [n['entity_id'] for n in all_neighbors]
-                logging.info(f"邻居数量({len(all_neighbors)})不超过10，无需预筛选")
 
-            logging.info(f"预筛选后的邻居数量: {len(prefiltered_neighbors)}")
 
-            # 步骤2：使用LLM从预筛选的neighbors中选择最佳的一个
             decision = self._select_next_node_with_llm(
                 current_entity, prefiltered_neighbors, issue_description, entity_searcher, depth
             )
 
             if not decision.get('should_continue', False):
-                # LLM决定停止探索，将当前路径作为一个候选链
                 if len(current_path) > len(best_chain):
                     best_chain = current_path.copy()
-                    logging.info(f"LLM决定停止，更新最佳路径，长度: {len(best_chain)}")
                 return True
 
             selected_neighbor = decision.get('selected_neighbor')
             if selected_neighbor and selected_neighbor in prefiltered_neighbors:
-                logging.info(f"继续探索选中邻居: {selected_neighbor}")
-                # 递归调用选中的邻居 (不再保存边信息)
                 if dfs(selected_neighbor, depth + 1, current_path.copy()):
                     return True
 
-            # 如果选中的邻居探索失败，尝试其他预筛选的邻居（限制数量避免过度探索）
             backup_count = 0
-            for neighbor in prefiltered_neighbors[:3]:  # 最多尝试3个其他邻居
+            for neighbor in prefiltered_neighbors[:3]:
                 if neighbor != selected_neighbor and neighbor not in visited:
                     backup_count += 1
-                    logging.info(f"尝试备选邻居 {backup_count}: {neighbor}")
 
-                    # 不再保存边信息，直接递归调用
                     if dfs(neighbor, depth + 1, current_path.copy()):
                         return True
 
             return False
 
-        # 在开始DFS之前存储issue描述
         issue_description = self._current_issue_description
 
         # Start DFS
-        logging.info("启动DFS搜索...")
         dfs(start_entity, 0, [])
 
-        logging.info(f"DFS完成，最佳链长度: {len(best_chain)}")
         return best_chain
 
     def _generate_localization_chains(self, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1474,34 +1391,32 @@ class EntityLocalizationPipeline:
             List of localization chains, one for each entity
         """
         logging.info("=== Stage 3: Generating Localization Chains (Parallel) ===")
-        logging.info(f"为 {len(entities)} 个entities生成定位链")
 
         if not entities:
-            logging.warning("没有entities用于生成定位链")
+            logging.warning("No entities are used to generate positioning chains")
             return []
 
         graph = get_graph()
         entity_searcher = get_graph_entity_searcher()
         dependency_searcher = get_graph_dependency_searcher()
 
-        logging.info("图对象获取完成")
 
         all_chains = []
         chain_lock = threading.Lock()
 
         def generate_chain_worker(entity_index: int, entity: Dict[str, Any]) -> Dict[str, Any]:
             """
-            单个entity的定位链生成工作函数
+            Generate worksheet for location chain of a single entity
 
             Args:
-                entity_index: entity在列表中的索引
-                entity: entity信息字典
+                entity_index: The index of the entity in the list
+                entity: Entity information dictionary
 
             Returns:
-                包含定位链信息的字典
+                A dictionary containing information about the location chain
             """
             entity_id = entity['entity_id']
-            logging.info(f"处理entity {entity_index + 1}/{len(entities)}: {entity_id}")
+            logging.info(f"entity {entity_index + 1}/{len(entities)}: {entity_id}")
 
             try:
                 if not entity_searcher.has_node(entity_id):
@@ -1512,8 +1427,6 @@ class EntityLocalizationPipeline:
                         'chain_length': 0,
                         'error': 'Entity not found in graph'
                     }
-
-                logging.info(f"在图中找到entity {entity_id}，开始DFS遍历...")
 
                 # Perform DFS traversal for this entity (now returns simplified chain)
                 chain = self._dfs_traversal(
@@ -1530,14 +1443,13 @@ class EntityLocalizationPipeline:
                     'chain_length': len(chain)
                 }
 
-                logging.info(f"Entity {entity_id} DFS完成，生成链长度: {len(chain)}")
                 if chain:
-                    logging.info(f"  简化定位链: {chain}")
+                    logging.info(f"Simplified positioning chain: {chain}")
 
                 return chain_info
 
             except Exception as e:
-                logging.error(f"Entity {entity_id} 定位链生成失败: {e}")
+                logging.error(f"Entity {entity_id} Location chain generation failed: {e}")
                 return {
                     'start_entity': entity,
                     'chain': [],
@@ -1545,26 +1457,21 @@ class EntityLocalizationPipeline:
                     'error': f'Chain generation failed: {e}'
                 }
 
-        # 使用线程池并行生成定位链
-        max_workers = min(len(entities), 5)  # 限制并发数避免过度占用资源
-        logging.info(f"启动 {max_workers} 个工作线程进行并行定位链生成")
+        max_workers = min(len(entities), 5)  
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 提交所有entity的生成任务
             futures = [
                 executor.submit(generate_chain_worker, i, entity)
                 for i, entity in enumerate(entities)
             ]
 
-            # 收集完成的结果
             for future in as_completed(futures):
                 try:
                     chain_info = future.result()
                     with chain_lock:
                         all_chains.append(chain_info)
                 except Exception as e:
-                    logging.error(f"定位链生成线程异常: {e}")
-                    # 添加一个空的chain_info避免丢失计数
+                    logging.error(f"Positioning chain generates thread exception: {e}")
                     with chain_lock:
                         all_chains.append({
                             'start_entity': {'entity_id': 'unknown'},
@@ -1573,13 +1480,10 @@ class EntityLocalizationPipeline:
                             'error': f'Thread execution failed: {e}'
                         })
 
-        # 按原始顺序排序结果（因为as_completed可能改变顺序）
-        # 通过start_entity的entity_id来匹配原始顺序
         entity_ids_order = [entity['entity_id'] for entity in entities]
         ordered_chains = []
 
         for entity_id in entity_ids_order:
-            # 找到对应的chain_info
             matching_chain = None
             for chain_info in all_chains:
                 if chain_info['start_entity'].get('entity_id') == entity_id:
@@ -1589,8 +1493,7 @@ class EntityLocalizationPipeline:
             if matching_chain:
                 ordered_chains.append(matching_chain)
             else:
-                # 如果没有找到匹配的，添加一个错误记录
-                logging.warning(f"未找到entity {entity_id} 的定位链结果")
+                logging.warning(f"No location chain result found for entity {entity_id}")
                 ordered_chains.append({
                     'start_entity': {'entity_id': entity_id},
                     'chain': [],
@@ -1598,107 +1501,91 @@ class EntityLocalizationPipeline:
                     'error': 'Result not found after parallel execution'
                 })
 
-        logging.info(f"所有定位链生成完成，总数: {len(ordered_chains)}")
+        logging.info(f"All positioning chains have been generated, total: {len(ordered_chains)}")
 
-        # 统计成功和失败的数量
         successful_chains = [c for c in ordered_chains if c.get('chain') and len(c['chain']) > 0]
         failed_chains = [c for c in ordered_chains if c.get('error')]
 
-        logging.info(f"成功生成定位链: {len(successful_chains)}")
-        logging.info(f"失败的定位链: {len(failed_chains)}")
+        logging.info(f"successful_chains: {len(successful_chains)}")
+        logging.info(f"failed_chains: {len(failed_chains)}")
 
         return ordered_chains
 
     def _select_diverse_chains(self, all_chains: List[Dict[str, Any]], max_selected: int = 6) -> List[Dict[str, Any]]:
         """
-        Stage 4: 使用embedding选择多样化的定位链（基于最长链）
+        Stage 4: Use embedding to select diverse positioning chains (based on the longest chain)
 
         Args:
-            all_chains: 所有生成的定位链
-            max_selected: 最大选择数量（包括最长链）
+            all_chains: All generated positioning chains
+            max_selected: Maximum selection quantity (including the longest chain)
 
         Returns:
-            选择的定位链列表
+            List of selected positioning chains
         """
-        logging.info(f"=== Stage 4: 选择多样化的定位链（基于最长链） ===")
-        logging.info(f"输入定位链总数: {len(all_chains)}")
+        logging.info(f"=== Stage 4: Use embedding to select diverse positioning chains (based on the longest chain) ===")
 
         if not all_chains:
-            logging.warning("没有可用的定位链")
+            logging.warning("No locating chain available")
             return []
 
-        # 检查空链数量
         non_empty_chains = [chain for chain in all_chains if chain.get('chain') and len(chain['chain']) > 0]
-        logging.info(f"非空定位链数量: {len(non_empty_chains)}")
+        logging.info(f"Number of non-empty positioning chains: {len(non_empty_chains)}")
 
         if len(non_empty_chains) <= max_selected:
-            logging.info(f"非空定位链数量({len(non_empty_chains)})不超过最大选择数量({max_selected})，全部返回")
+            logging.info(f"Number of non-empty positioning chains({len(non_empty_chains)}) not exceed the maximum number of selections({max_selected}) return all")
             return non_empty_chains
 
-        # 提取纯定位链用于embedding计算
         chains_for_embedding = [chain_info['chain'] for chain_info in all_chains]
 
         try:
-            # 使用embedding选择多样化的链（包含空链过滤和去重）
             selected_indices, similarity_scores = self.chain_embedding.select_diverse_chains(
-                chains_for_embedding, k=max_selected - 1  # -1因为已包含最长链
+                chains_for_embedding, k=max_selected - 1  
             )
 
             if not selected_indices:
-                logging.warning("embedding选择未返回任何索引，使用fallback策略")
-                # fallback: 按长度降序选择
                 sorted_chains = sorted(non_empty_chains, key=lambda x: x['chain_length'], reverse=True)
                 return sorted_chains[:max_selected]
 
-            # 构建选择的定位链结果
             selected_chains = []
             for i, idx in enumerate(selected_indices):
                 if idx >= len(all_chains):
-                    logging.warning(f"索引 {idx} 超出范围，跳过")
+                    logging.warning(f"Index {idx} out of range, skipping")
                     continue
 
                 chain_info = deepcopy(all_chains[idx])
                 chain_info['selection_rank'] = i + 1
                 chain_info['similarity_to_longest'] = similarity_scores[i] if i < len(similarity_scores) else 1.0
-                chain_info['is_longest'] = (i == 0)  # 第一个总是最长的
+                chain_info['is_longest'] = (i == 0)  
                 selected_chains.append(chain_info)
 
-            logging.info(f"成功选择 {len(selected_chains)} 条多样化定位链")
             for i, chain in enumerate(selected_chains):
-                logging.info(f"  选择链 {i + 1}: 长度={chain['chain_length']}, "
-                             f"相似度={chain['similarity_to_longest']:.3f}, "
-                             f"是否最长={chain['is_longest']}")
-                logging.info(f"    链内容: {chain['chain']}")
+                logging.info(f"content: {chain['chain']}")
 
             return selected_chains
 
         except Exception as e:
-            logging.error(f"定位链选择失败: {e}，返回按长度排序的链")
-            # 如果embedding选择失败，返回长度最长的几条链
+            logging.error(f"Failed to select the positioning chain: {e}, return the chain sorted by length")
             sorted_chains = sorted(non_empty_chains, key=lambda x: x['chain_length'], reverse=True)
             return sorted_chains[:max_selected]
 
     def _fallback_node_selection(self, current_entity: str, neighbors: List[str], entity_searcher, depth: int) -> Dict[
         str, Any]:
         """
-        LLM节点选择的fallback逻辑
+        Fallback logic for LLM node selection
 
         Args:
-            current_entity: 当前实体ID
-            neighbors: 邻居节点列表
-            entity_searcher: 实体搜索器
-            depth: 当前深度
+            current_entity: Current entity ID
+            neighbors: List of neighboring nodes
+            entity_searcher: Entity searcher
+            depth: Current depth
 
         Returns:
-            包含选择决策的字典
+            A dictionary containing the selection decisions
         """
-        logging.info(f"使用fallback逻辑选择节点，当前深度: {depth}")
 
         if not neighbors:
             return {"should_continue": False, "selected_neighbor": None, "reasoning": "No neighbors available"}
 
-        # 简单的fallback策略：
-        # 1. 如果深度太深，停止探索
         if depth >= self.max_depth - 1:
             return {
                 "should_continue": False,
@@ -1706,8 +1593,7 @@ class EntityLocalizationPipeline:
                 "reasoning": f"Reached maximum depth {self.max_depth}"
             }
 
-        # 2. 随机选择一个邻居继续探索
-        selected_neighbor = neighbors[0]  # 选择第一个邻居
+        selected_neighbor = neighbors[0]
 
         return {
             "should_continue": True,
@@ -1717,40 +1603,38 @@ class EntityLocalizationPipeline:
 
     def _add_code_to_chains(self, selected_chains: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Stage 5: 为选择的定位链添加代码信息
+        Stage 5: Add code information to the selected positioning chain
 
         Args:
-            selected_chains: 选择的定位链列表
+            selected_chains: List of selected positioning chains
 
         Returns:
-            包含代码信息的定位链列表
+            A list of location chains containing code information
         """
-        logging.info(f"=== Stage 5: 为 {len(selected_chains)} 条定位链添加代码信息 ===")
+        logging.info(f"=== Stage 5: Add code information for {len(selected_chains)} location chains ===")
 
         chains_with_code = []
         entity_searcher = get_graph_entity_searcher()
-        MAX_CODE_LENGTH = 10000  # 设置代码长度限制
+        MAX_CODE_LENGTH = 10000 
 
         for i, chain_info in enumerate(selected_chains):
             chain_id = f"chain_{i + 1}"
             chain = chain_info['chain']
 
-            logging.info(f"处理链 {chain_id}，长度: {len(chain)}")
+            logging.info(f"Processing chain {chain_id}, length: {len(chain)}")
 
-            # 为链中的每个实体获取代码
             entities_with_code = []
             for j, entity_id in enumerate(chain):
-                logging.info(f"  获取实体 {j + 1}/{len(chain)}: {entity_id}")
+                logging.info(f"Get entity {j + 1}/{len(chain)}: {entity_id}")
 
                 try:
                     if entity_searcher.has_node(entity_id):
                         entity_data = entity_searcher.get_node_data([entity_id], return_code_content=True)[0]
                         code_content = entity_data.get('code_content', '')
 
-                        # 检查代码长度，如果超过限制则不保留代码
                         if len(code_content) > MAX_CODE_LENGTH:
                             logging.info(
-                                f"    实体代码长度 {len(code_content)} 超过限制 {MAX_CODE_LENGTH}，仅保留entity名字")
+                                f"Entity code length {len(code_content)} exceeds the limit {MAX_CODE_LENGTH}, only the entity name is retained")
                             entity_with_code = {
                                 'entity_id': entity_id,
                                 'type': entity_data['type'],
@@ -1773,9 +1657,9 @@ class EntityLocalizationPipeline:
 
                         entities_with_code.append(entity_with_code)
                         logging.info(
-                            f"    成功获取代码，长度: {len(entity_with_code['code'])} (原始长度: {len(code_content)})")
+                            f" Successfully obtained code, length: {len(entity_with_code['code'])} (original length: {len(code_content)})")
                     else:
-                        logging.warning(f"    实体 {entity_id} 在图中不存在")
+                        logging.warning(f"Entity {entity_id} does not exist in the graph")
                         entities_with_code.append({
                             'entity_id': entity_id,
                             'type': 'unknown',
@@ -1786,7 +1670,7 @@ class EntityLocalizationPipeline:
                             'original_code_length': 0
                         })
                 except Exception as e:
-                    logging.error(f"    获取实体 {entity_id} 代码失败: {e}")
+                    logging.error(f"Get entity {entity_id} code failed: {e}")
                     entities_with_code.append({
                         'entity_id': entity_id,
                         'type': 'error',
@@ -1797,7 +1681,6 @@ class EntityLocalizationPipeline:
                         'original_code_length': 0
                     })
 
-            # 构建包含代码的链信息
             chain_with_code = {
                 'chain_id': chain_id,
                 'original_chain_info': chain_info,
@@ -1809,33 +1692,31 @@ class EntityLocalizationPipeline:
 
             chains_with_code.append(chain_with_code)
 
-            # 统计代码省略情况
             omitted_count = sum(1 for entity in entities_with_code if entity.get('code_omitted', False))
             total_code_length = sum(entity.get('original_code_length', 0) for entity in entities_with_code)
 
-            logging.info(f"链 {chain_id} 处理完成，包含 {len(entities_with_code)} 个实体代码")
-            logging.info(f"  其中 {omitted_count} 个实体代码被省略，总代码长度: {total_code_length}")
+            logging.info(f"Chain {chain_id} processing complete, containing {len(entities_with_code)} entity codes")
+            logging.info(f"  Among them, {omitted_count} entity codes were omitted, total code length: {total_code_length}")
 
-        logging.info(f"阶段5完成，所有 {len(chains_with_code)} 条链都已添加代码信息")
+        logging.info(f"Stage 5 complete, all {len(chains_with_code)} chains have added code information")
         return chains_with_code
 
     def _vote_on_chains(self, chains_with_code: List[Dict[str, Any]], issue_description: str, num_agents: int = 5) -> \
             Dict[str, Any]:
         """
-        Stage 6: 使用多个agent对定位链进行投票
+        Stage 6: Use multiple agents to vote on the positioning chain
 
         Args:
-            chains_with_code: 包含代码的定位链列表
-            issue_description: 问题描述
-            num_agents: 投票agent数量
+            chains_with_code: List of location chains containing code
+            issue_description: Problem Description
+            num_agents: Number of voting agents
 
         Returns:
-            投票结果
+            vote results
         """
-        logging.info(f"=== Stage 6: 使用 {num_agents} 个agent对 {len(chains_with_code)} 条定位链进行投票 ===")
+        logging.info(f"=== Stage 6: Use {num_agents} agents to vote on {len(chains_with_code)} location chains ===")
 
         if not chains_with_code:
-            logging.warning("没有可投票的定位链")
             return {
                 'success': False,
                 'error': 'No chains to vote on',
@@ -1843,17 +1724,14 @@ class EntityLocalizationPipeline:
                 'winning_chain': None
             }
 
-        # 构建chains信息字符串
         chains_info = self._format_chains_for_voting(chains_with_code)
 
-        # 使用多线程并行进行投票
         vote_results = []
         vote_lock = threading.Lock()
 
         def vote_worker(agent_id: int) -> Dict[str, Any]:
-            """单个agent的投票工作函数"""
             try:
-                logging.info(f"Agent {agent_id} 开始投票...")
+                logging.info(f"Agent {agent_id} begin...")
 
                 prompt = CHAIN_VOTING_PROMPT.format(
                     issue_description=issue_description,
@@ -1873,47 +1751,43 @@ class EntityLocalizationPipeline:
 
                 response = self._call_llm_simple(
                     messages=messages,
-                    temp=0.7,  # 适当的温度保证多样性
+                    temp=0.7,  
                     max_tokens=2000
                 )
 
-                # 解析投票结果
                 vote_result = self._parse_vote_result(response, agent_id)
 
                 with vote_lock:
                     vote_results.append(vote_result)
-                    logging.info(f"Agent {agent_id} 投票完成: {vote_result.get('voted_chain_id', 'unknown')}")
+                    logging.info(f"Agent {agent_id} complete: {vote_result.get('voted_chain_id', 'unknown')}")
 
                 return vote_result
 
             except Exception as e:
-                logging.error(f"Agent {agent_id} 投票失败: {e}")
+                logging.error(f"Agent {agent_id} fail: {e}")
                 return {
                     'agent_id': agent_id,
                     'voted_chain_id': None,
                     'confidence': 0,
-                    'reasoning': f'投票失败: {e}',
+                    'reasoning': f'fail: {e}',
                     'error': str(e)
                 }
 
-        # 并行执行投票
         with ThreadPoolExecutor(max_workers=min(num_agents, 3)) as executor:
             futures = [executor.submit(vote_worker, i + 1) for i in range(num_agents)]
 
             for future in as_completed(futures):
                 try:
-                    future.result()  # 等待完成，错误已在worker中处理
+                    future.result()  
                 except Exception as e:
-                    logging.error(f"投票线程异常: {e}")
+                    logging.error(f"Voting thread abnormality: {e}")
 
-        # 统计投票结果
         voting_summary = self._analyze_voting_results(vote_results, chains_with_code)
 
-        logging.info(f"投票完成，获胜链: {voting_summary.get('winning_chain_id', 'None')}")
+        logging.info(f"Voting completed, winning chain: {voting_summary.get('winning_chain_id', 'None')}")
         return voting_summary
 
     def _format_chains_for_voting(self, chains_with_code: List[Dict[str, Any]]) -> str:
-        """格式化定位链信息用于投票（简化版本，只包含实体和完整代码）"""
         chains_info_parts = []
 
         for chain_data in chains_with_code:
@@ -1932,9 +1806,7 @@ class EntityLocalizationPipeline:
         return "\n".join(chains_info_parts)
 
     def _parse_vote_result(self, response: str, agent_id: int) -> Dict[str, Any]:
-        """解析单个agent的投票结果"""
         try:
-            # 清理响应文本
             response_text = response.strip()
             if response_text.startswith('```json'):
                 response_text = response_text[7:]
@@ -1944,36 +1816,30 @@ class EntityLocalizationPipeline:
             vote_data = json.loads(response_text)
             vote_data['agent_id'] = agent_id
 
-            # 验证必要字段
             if 'voted_chain_id' not in vote_data:
                 raise ValueError("Missing voted_chain_id")
 
-            logging.info(f"Agent {agent_id} 投票解析成功: {vote_data['voted_chain_id']}")
+            logging.info(f"Agent {agent_id} success: {vote_data['voted_chain_id']}")
             return vote_data
 
         except Exception as e:
-            logging.error(f"Agent {agent_id} 投票结果解析失败: {e}")
+            logging.error(f"Agent {agent_id} fail: {e}")
             return {
                 'agent_id': agent_id,
                 'voted_chain_id': None,
                 'confidence': 0,
-                'reasoning': f'解析失败: {e}',
+                'reasoning': f'fail: {e}',
                 'error': str(e)
             }
 
     def _analyze_voting_results(self, vote_results: List[Dict[str, Any]], chains_with_code: List[Dict[str, Any]]) -> \
             Dict[str, Any]:
-        """分析投票结果"""
-        logging.info("分析投票结果...")
-
-        # 统计有效投票
         valid_votes = [v for v in vote_results if v.get('voted_chain_id') and 'error' not in v]
         invalid_votes = [v for v in vote_results if 'error' in v or not v.get('voted_chain_id')]
 
-        logging.info(f"有效投票: {len(valid_votes)}, 无效投票: {len(invalid_votes)}")
+        logging.info(f"Valid votes: {len(valid_votes)}, Invalid votes: {len(invalid_votes)}")
 
         if not valid_votes:
-            logging.warning("没有有效投票")
             return {
                 'success': False,
                 'error': 'No valid votes received',
@@ -1981,21 +1847,17 @@ class EntityLocalizationPipeline:
                 'winning_chain': None
             }
 
-        # 统计每条链的得票数
         vote_counts = Counter(v['voted_chain_id'] for v in valid_votes)
 
-        # 找到获胜链
         winning_chain_id = vote_counts.most_common(1)[0][0]
         winning_votes = vote_counts[winning_chain_id]
 
-        # 找到对应的链数据
         winning_chain_data = None
         for chain in chains_with_code:
             if chain['chain_id'] == winning_chain_id:
                 winning_chain_data = chain
                 break
 
-        # 计算平均置信度
         winning_confidences = [v.get('confidence', 0) for v in valid_votes if v['voted_chain_id'] == winning_chain_id]
         avg_confidence = sum(winning_confidences) / len(winning_confidences) if winning_confidences else 0
 
@@ -2012,11 +1874,8 @@ class EntityLocalizationPipeline:
             'invalid_votes': invalid_votes
         }
 
-        logging.info(f"投票结果分析完成:")
-        logging.info(f"  获胜链: {winning_chain_id}")
-        logging.info(f"  得票数: {winning_votes}/{len(valid_votes)}")
-        logging.info(f"  平均置信度: {avg_confidence:.1f}")
-        logging.info(f"  投票分布: {dict(vote_counts)}")
+        logging.info(f"Voting result analysis completed:")
+        logging.info(f"  Winning chain: {winning_chain_id}")
 
         return voting_summary
 
@@ -2024,30 +1883,27 @@ class EntityLocalizationPipeline:
                                    instance_id: str = None, cache_timestamp: str = None) -> \
             Dict[str, Any]:
         """
-        Stage 7: 生成修改plan的多轮agent讨论
+        Stage 7: Generate multiple rounds of agent discussions to modify the plan
 
         Args:
-            winning_chain: 获胜的定位链
-            issue_description: 问题描述
-            num_agents: 参与讨论的agent数量
-            instance_id: 实例ID，用于缓存
-            cache_timestamp: 缓存时间戳
+            winning_chain: Winning positioning chain
+            issue_description: Problem Description
+            num_agents: Number of agents participating in the discussion
+            instance_id: Instance ID for caching
+            cache_timestamp: Cache timestamp
 
         Returns:
-            最终的修改plan
+            Final modification plan
         """
-        logging.info(f"=== Stage 7: 使用 {num_agents} 个agent进行修改plan讨论 ===")
+        logging.info(f"=== Stage 7: Use {num_agents} agents to discuss modifying the plan ===")
 
-        # 准备chain信息
         chain_info = self._format_chain_for_modification_discussion(winning_chain)
 
-        # 第一轮：每个agent独立分析修改位置
-        logging.info("第一轮: 每个agent独立分析修改位置")
+        #Each agent independently analyzes and modifies the position
         first_round_analyses = self._conduct_first_round_analysis(
             chain_info, issue_description, num_agents, instance_id, cache_timestamp
         )
         
-        # 保存第一轮分析结果
         if instance_id and cache_timestamp:
             stage7_round1_data = {
                 'first_round_analyses': first_round_analyses,
@@ -2056,13 +1912,11 @@ class EntityLocalizationPipeline:
             }
             self._save_stage_result(instance_id, 'stage_7_round1_analysis', stage7_round1_data, cache_timestamp)
 
-        # 第二轮：每个agent基于其他agent的分析进行综合判断
-        logging.info("第二轮: agent综合其他agent的分析进行判断")
+        # debate
         second_round_analyses = self._conduct_second_round_analysis(
             chain_info, issue_description, first_round_analyses, instance_id, cache_timestamp
         )
         
-        # 保存第二轮分析结果
         if instance_id and cache_timestamp:
             stage7_round2_data = {
                 'second_round_analyses': second_round_analyses,
@@ -2070,13 +1924,11 @@ class EntityLocalizationPipeline:
             }
             self._save_stage_result(instance_id, 'stage_7_round2_analysis', stage7_round2_data, cache_timestamp)
 
-        # 第三轮：discriminator进行最终判定
-        logging.info("第三轮: discriminator进行最终判定")
+        # discriminator
         final_plan = self._conduct_final_discrimination(
             chain_info, issue_description, second_round_analyses, instance_id, cache_timestamp
         )
         
-        # 保存最终判定结果
         if instance_id and cache_timestamp:
             stage7_final_data = {
                 'final_plan': final_plan,
@@ -2085,11 +1937,12 @@ class EntityLocalizationPipeline:
             self._save_stage_result(instance_id, 'stage_7_final_plan', stage7_final_data, cache_timestamp)
 
         logging.info(
-            f"修改plan生成完成，包含 {len(final_plan.get('final_plan', {}).get('modifications', []))} 个修改步骤")
+            f"Modification plan generation completed, including {len(final_plan.get('final_plan', {}).get('modifications', []))} modification steps"
+        )
         return final_plan
 
     def _format_chain_for_modification_discussion(self, winning_chain: Dict[str, Any]) -> str:
-        """格式化获胜链信息用于修改讨论"""
+        """Format winning chain information for modification discussion"""
         entities = winning_chain.get('entities_with_code', [])
 
         chain_info = f"**Winning Localization Chain ({winning_chain.get('chain_id', 'unknown')}):**\n\n"
@@ -2107,13 +1960,10 @@ class EntityLocalizationPipeline:
     def _conduct_first_round_analysis(self, chain_info: str, issue_description: str, num_agents: int,
                                      instance_id: str = None, cache_timestamp: str = None) -> List[
         Dict[str, Any]]:
-        """第一轮分析：每个agent独立分析修改位置"""
         first_round_results = []
 
         def analyze_worker(agent_id: int) -> Dict[str, Any]:
             try:
-                logging.info(f"Agent {agent_id} 开始第一轮分析...")
-
                 prompt = MODIFICATION_LOCATION_PROMPT.format(
                     issue_description=issue_description,
                     chain_info=chain_info
@@ -2137,11 +1987,10 @@ class EntityLocalizationPipeline:
                 )
 
                 analysis = self._parse_modification_analysis(response, agent_id, "first_round")
-                logging.info(f"Agent {agent_id} 第一轮分析完成")
                 return analysis
 
             except Exception as e:
-                logging.error(f"Agent {agent_id} 第一轮分析失败: {e}")
+                logging.error(f"Agent {agent_id} fail: {e}")
                 return {
                     'agent_id': agent_id,
                     'round': 'first_round',
@@ -2149,7 +1998,6 @@ class EntityLocalizationPipeline:
                     'error': str(e)
                 }
 
-        # 并行执行第一轮分析
         with ThreadPoolExecutor(max_workers=min(num_agents, 3)) as executor:
             futures = [executor.submit(analyze_worker, i + 1) for i in range(num_agents)]
 
@@ -2158,20 +2006,15 @@ class EntityLocalizationPipeline:
                     result = future.result()
                     first_round_results.append(result)
                 except Exception as e:
-                    logging.error(f"第一轮分析线程异常: {e}")
-
-        valid_analyses = [r for r in first_round_results if r.get('analysis')]
-        logging.info(f"第一轮分析完成，有效分析: {len(valid_analyses)}/{num_agents}")
+                    logging.error(f"fail: {e}")
 
         return first_round_results
     
     def _conduct_second_round_analysis(self, chain_info: str, issue_description: str,
                                        first_round_analyses: List[Dict[str, Any]],
                                        instance_id: str = None, cache_timestamp: str = None) -> List[Dict[str, Any]]:
-        """第二轮分析：agent综合其他agent的分析"""
         second_round_results = []
 
-        # 准备其他agent的分析摘要
         def prepare_other_agents_summary(current_agent_id: int) -> str:
             other_analyses = [a for a in first_round_analyses if
                               a.get('agent_id') != current_agent_id and a.get('analysis')]
@@ -2186,7 +2029,7 @@ class EntityLocalizationPipeline:
                 modifications = agent_info.get('modification_locations', [])
                 if modifications:
                     summary += "Proposed modifications:\n"
-                    for j, mod in enumerate(modifications):  # 限制显示前3个[:3]，还是不限制好
+                    for j, mod in enumerate(modifications): 
                         summary += f"  {j + 1}. {mod.get('entity_id', 'N/A')}: {mod.get('location_description', 'N/A')}\n"
                         summary += f"     Priority: {mod.get('priority', 'N/A')}, Type: {mod.get('modification_type', 'N/A')}\n"
                 summary += "\n"
@@ -2197,8 +2040,6 @@ class EntityLocalizationPipeline:
             agent_id = agent_analysis.get('agent_id')
 
             try:
-                logging.info(f"Agent {agent_id} 开始第二轮分析...")
-
                 your_initial_analysis = json.dumps(agent_analysis.get('analysis', {}), indent=2)
                 other_agents_analyses = prepare_other_agents_summary(agent_id)
 
@@ -2227,11 +2068,10 @@ class EntityLocalizationPipeline:
                 )
 
                 refined_analysis = self._parse_modification_analysis(response, agent_id, "second_round")
-                logging.info(f"Agent {agent_id} 第二轮分析完成")
                 return refined_analysis
 
             except Exception as e:
-                logging.error(f"Agent {agent_id} 第二轮分析失败: {e}")
+                logging.error(f"Agent {agent_id} fail: {e}")
                 return {
                     'agent_id': agent_id,
                     'round': 'second_round',
@@ -2239,10 +2079,8 @@ class EntityLocalizationPipeline:
                     'error': str(e)
                 }
 
-        # 只对第一轮有效分析的agent进行第二轮
         valid_first_round = [a for a in first_round_analyses if a.get('analysis')]
 
-        # 并行执行第二轮分析
         with ThreadPoolExecutor(max_workers=min(len(valid_first_round), 1)) as executor:
             futures = [executor.submit(analyze_worker_round2, analysis) for analysis in valid_first_round]
 
@@ -2251,20 +2089,15 @@ class EntityLocalizationPipeline:
                     result = future.result()
                     second_round_results.append(result)
                 except Exception as e:
-                    logging.error(f"第二轮分析线程异常: {e}")
+                    logging.error(f"fail: {e}")
 
         valid_second_round = [r for r in second_round_results if r.get('analysis')]
-        logging.info(f"第二轮分析完成，有效分析: {len(valid_second_round)}/{len(valid_first_round)}")
 
         return second_round_results
 
     def _conduct_final_discrimination(self, chain_info: str, issue_description: str,
                                       second_round_analyses: List[Dict[str, Any]], 
                                       instance_id: str = None, cache_timestamp: str = None) -> Dict[str, Any]:
-        """第三轮：discriminator进行最终判定"""
-        logging.info("Discriminator开始最终判定...")
-
-        # 准备所有agent的最终分析
         all_agents_summary = ""
         valid_analyses = [a for a in second_round_analyses if a.get('analysis')]
 
@@ -2285,10 +2118,9 @@ class EntityLocalizationPipeline:
                     all_agents_summary += f"     Location: {mod.get('location_description', 'N/A')}\n"
                     all_agents_summary += f"     Type: {mod.get('modification_type', 'N/A')}\n"
                     all_agents_summary += f"     Priority: {mod.get('priority', 'N/A')}\n"
-                    all_agents_summary += f"     Reasoning: {mod.get('reasoning', 'N/A')[:200]}...\n"
+                    all_agents_summary += f"     Reasoning: {mod.get('reasoning', 'N/A')}...\n"
             all_agents_summary += "\n"
 
-        # 使用discriminator进行最终判定
         try:
             prompt = FINAL_DISCRIMINATOR_PROMPT.format(
                 issue_description=issue_description,
@@ -2309,16 +2141,14 @@ class EntityLocalizationPipeline:
 
             response = self._call_llm_simple(
                 messages=messages,
-                temp=0.3,  # 降低温度以获得更稳定的判断
+                temp=0.3,  
                 max_tokens=5000
             )
 
             final_plan = self._parse_final_plan(response)
-            logging.info("Discriminator最终判定完成")
             return final_plan
 
         except Exception as e:
-            logging.error(f"Discriminator最终判定失败: {e}")
             return {
                 'success': False,
                 'error': f'Final discrimination failed: {e}',
@@ -2329,9 +2159,7 @@ class EntityLocalizationPipeline:
             }
 
     def _parse_modification_analysis(self, response: str, agent_id: int, round_name: str) -> Dict[str, Any]:
-        """解析修改分析结果"""
         try:
-            # 清理响应文本
             response_text = response.strip()
             if response_text.startswith('```json'):
                 response_text = response_text[7:]
@@ -2347,7 +2175,7 @@ class EntityLocalizationPipeline:
             }
 
         except Exception as e:
-            logging.error(f"Agent {agent_id} {round_name} 分析结果解析失败: {e}")
+            logging.error(f"Agent {agent_id} {round_name} fail: {e}")
             return {
                 'agent_id': agent_id,
                 'round': round_name,
@@ -2356,9 +2184,7 @@ class EntityLocalizationPipeline:
             }
 
     def _parse_final_plan(self, response: str) -> Dict[str, Any]:
-        """解析最终的修改plan"""
         try:
-            # 清理响应文本
             response_text = response.strip()
             if response_text.startswith('```json'):
                 response_text = response_text[7:]
@@ -2367,7 +2193,6 @@ class EntityLocalizationPipeline:
 
             plan_data = json.loads(response_text)
 
-            # 验证plan格式
             final_plan = plan_data.get('final_plan', {})
             if not final_plan.get('modifications'):
                 raise ValueError("Final plan must contain modifications")
@@ -2381,7 +2206,7 @@ class EntityLocalizationPipeline:
             }
 
         except Exception as e:
-            logging.error(f"最终plan解析失败: {e}")
+            logging.error(f"plan fail: {e}")
             return {
                 'success': False,
                 'error': f'Final plan parsing failed: {e}',
@@ -2392,10 +2217,8 @@ class EntityLocalizationPipeline:
             }
 
     def _extract_entity_groups(self, initial_entities: List[str], problem_statement: str) -> List[Dict[str, Any]]:
-        """提取entity组的辅助方法"""
         entity_groups = []
         for i, initial_entity in enumerate(initial_entities):
-            logging.info(f"处理初始entity {i + 1}/{len(initial_entities)}: '{initial_entity}'")
             related_entities = self._extract_related_entities_for_initial_entity(
                 initial_entity, problem_statement
             )
@@ -2407,7 +2230,6 @@ class EntityLocalizationPipeline:
 
     def _generate_all_localization_chains(self, entity_groups: List[Dict[str, Any]]) -> Tuple[
         List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """生成所有定位链的辅助方法"""
         grouped_localization_chains = []
         all_chains = []
 
@@ -2421,7 +2243,6 @@ class EntityLocalizationPipeline:
                 'chain_count': len(localization_chains)
             })
 
-            # 收集所有有效的定位链
             for chain_info in localization_chains:
                 if chain_info.get('chain') and len(chain_info['chain']) > 0:
                     all_chains.append({
@@ -2436,22 +2257,18 @@ class EntityLocalizationPipeline:
     def _format_edit_agent_prompt(self, issue_description: str, modification_plan: Dict[str, Any],
                                   winning_chain: Dict[str, Any]) -> str:
         """
-        格式化输出给edit agent的信息
+        Formats information output to the edit agent
 
         Args:
-            issue_description: 问题描述
-            modification_plan: 修改计划
-            winning_chain: 获胜的定位链
+            issue_description: Problem Description
+            modification_plan: Modification Plan
+            winning_chain: Winning Localization Chain
 
         Returns:
-            格式化的prompt字符串
+            Formatted prompt string
         """
-        logging.info("开始格式化edit agent prompt")
-
-        # 第一部分：Issue
         issue_section = f"<issue>\n{issue_description}\n</issue>\n\n"
 
-        # 第二部分：Plan（使用醒目的stage标记）
         plan_section = "<plan>\n"
 
         final_plan = modification_plan.get('final_plan', {})
@@ -2462,25 +2279,21 @@ class EntityLocalizationPipeline:
             instruction = modification.get('instruction', 'No instruction provided')
             context = modification.get('context', 'No context provided')
 
-            # 使用醒目的stage标记格式
             plan_section += f"***stage {step}***\n"
             plan_section += f"instruction: {instruction}\n"
             plan_section += f"context: {context}\n\n"
 
         plan_section += "</plan>\n\n"
 
-        # 第三部分：代码片段（处理已包含行号的代码）
         code_section = "<code>\n"
 
         entities_with_code = winning_chain.get('entities_with_code', [])
 
-        # 按文件路径分组实体
         file_entities = {}
         for entity in entities_with_code:
             entity_id = entity.get('entity_id', '')
             code = entity.get('code', '')
 
-            # 提取文件路径
             if ':' in entity_id:
                 file_path = entity_id.split(':')[0]
             else:
@@ -2494,7 +2307,6 @@ class EntityLocalizationPipeline:
                 'code': code
             })
 
-        # 为每个文件格式化代码
         for file_path, entities in file_entities.items():
             code_section += f"{file_path}:\n"
 
@@ -2502,69 +2314,56 @@ class EntityLocalizationPipeline:
                 code = entity['code']
 
                 if code and code.strip():
-                    # 清理代码格式（移除markdown代码块标记但保留行号）
                     formatted_code = self._clean_code_format(code)
                     code_section += formatted_code + "\n"
                 else:
                     code_section += f"# No code available for {entity['entity_id']}\n"
 
-            code_section += "\n"  # 文件之间的分隔
+            code_section += "\n" 
 
         code_section += "</code>"
 
-        # 组合所有部分
         full_prompt = issue_section + plan_section + code_section
 
-        logging.info(f"edit agent prompt格式化完成，总长度: {len(full_prompt)}")
-        logging.info(f"包含 {len(file_entities)} 个文件的代码")
+        logging.info(f"edit agent prompt formatting completed, total length: {len(full_prompt)}")
 
         return full_prompt
 
     def _clean_code_format(self, code: str) -> str:
         """
-        清理代码格式，移除markdown标记但保留原有的行号
+        Clean up the code format, remove the markdown tags but keep the original line numbers
 
         Args:
-            code: 原始代码字符串，可能包含markdown格式和行号
+            code: A raw code string, possibly with markdown formatting and line numbers
 
         Returns:
-            清理后的代码字符串
+            Cleaned code string
         """
         if not code or not code.strip():
             return "# No code content"
 
-        # 移除开头和结尾的markdown代码块标记
         cleaned_code = code.strip()
 
-        # 移除开头的```或```python等
         if cleaned_code.startswith('```'):
             lines = cleaned_code.split('\n')
-            # 找到第一行```之后的内容
             start_idx = 1
             if len(lines) > 1:
                 cleaned_code = '\n'.join(lines[start_idx:])
 
-        # 移除结尾的```
         if cleaned_code.endswith('```'):
             lines = cleaned_code.split('\n')
-            # 移除最后的```行
             if lines and lines[-1].strip() == '```':
                 cleaned_code = '\n'.join(lines[:-1])
 
-        # 处理行号格式：如果代码已经包含行号（格式如 "102 | def page_range"），直接返回
         lines = cleaned_code.split('\n')
         formatted_lines = []
 
         for line in lines:
-            # 检查是否已经有行号格式（数字 + | 或数字 + 空格）
             stripped_line = line.strip()
             if stripped_line and (
-                    # 格式1: "102 | def page_range"
                     ('|' in line and line.split('|')[0].strip().isdigit()) or
-                    # 格式2: "102    def page_range" (数字开头且后面有空格)
                     (len(line) > 0 and line.split()[0].isdigit() and len(line.split()) > 1)
             ):
-                # 已经有行号，保持原格式但统一为空格分隔
                 if '|' in line:
                     parts = line.split('|', 1)
                     if len(parts) == 2 and parts[0].strip().isdigit():
@@ -2576,31 +2375,14 @@ class EntityLocalizationPipeline:
                 else:
                     formatted_lines.append(line)
             else:
-                # 没有行号的行（可能是空行或注释），直接保留
                 formatted_lines.append(line)
 
         return '\n'.join(formatted_lines)
 
-    def _add_line_numbers_to_code(self, code: str, start_line: Optional[int] = None) -> str:
-        """
-        为代码添加行号（已废弃，被_clean_code_format替代）
-
-        Args:
-            code: 源代码
-            start_line: 起始行号，如果为None则从1开始
-
-        Returns:
-            带行号的代码
-        """
-        # 这个方法已被_clean_code_format替代，但保留以避免破坏其他可能的调用
-        return self._clean_code_format(code)
-
     def _ensure_cache_dir_exists(self):
-        """确保缓存目录存在"""
         os.makedirs(self.cache_dir, exist_ok=True)
     
     def _get_cache_file_path(self, instance_id: str, timestamp: str = None) -> str:
-        """获取缓存文件路径"""
         if timestamp is None:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         
@@ -2612,36 +2394,31 @@ class EntityLocalizationPipeline:
     
     def _save_stage_result(self, instance_id: str, stage_name: str, stage_data: Dict[str, Any], 
                           timestamp: str = None):
-        """保存单个stage的结果"""
         if not self.enable_cache:
             return
             
         try:
             cache_file = self._get_cache_file_path(instance_id, timestamp)
             
-            # 读取现有缓存或创建新的
             cache_data = {}
             if os.path.exists(cache_file):
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     cache_data = json.load(f)
-            
-            # 添加stage结果
+
             cache_data[stage_name] = {
                 'timestamp': datetime.now().isoformat(),
                 'data': stage_data
             }
             
-            # 保存到文件
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, indent=2, ensure_ascii=False)
                 
-            logging.info(f"已保存 {stage_name} 结果到缓存文件: {cache_file}")
+            logging.info(f"Saved {stage_name} results to cache file: {cache_file}")
             
         except Exception as e:
-            logging.error(f"保存stage结果失败: {e}")
+            logging.error(f"Failed to save stage results: {e}")
     
     def _load_stage_result(self, instance_id: str, stage_name: str, timestamp: str = None) -> Optional[Dict[str, Any]]:
-        """加载单个stage的结果"""
         if not self.enable_cache:
             return None
             
@@ -2655,34 +2432,34 @@ class EntityLocalizationPipeline:
                 cache_data = json.load(f)
             
             if stage_name in cache_data:
-                logging.info(f"从缓存加载 {stage_name} 结果: {cache_file}")
+                logging.info(f"Load {stage_name} result from cache: {cache_file}")
                 return cache_data[stage_name]['data']
             
             return None
             
         except Exception as e:
-            logging.error(f"加载stage结果失败: {e}")
+            logging.error(f"Failed to load stage result: {e}")
             return None
     
     def _list_cached_instances(self) -> List[str]:
-        """列出所有缓存的instance"""
+        """List all cached instances"""
         try:
             if not os.path.exists(self.cache_dir):
                 return []
             return [d for d in os.listdir(self.cache_dir) 
                    if os.path.isdir(os.path.join(self.cache_dir, d))]
         except Exception as e:
-            logging.error(f"列出缓存实例失败: {e}")
+            logging.error(f"Failed to list cache instances: {e}")
             return []
     
     def _list_cached_files_for_instance(self, instance_id: str) -> List[str]:
-        """列出指定instance的所有缓存文件"""
+        """List all cache files for the specified instance"""
         try:
             instance_dir = os.path.join(self.cache_dir, instance_id)
             if not os.path.exists(instance_dir):
                 return []
             return [f for f in os.listdir(instance_dir) if f.endswith('_pipeline_cache.json')]
         except Exception as e:
-            logging.error(f"列出实例缓存文件失败: {e}")
+            logging.error(f"Failed to list instance cache files: {e}")
             return []
 

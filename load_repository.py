@@ -18,7 +18,7 @@ from moatless.file_context import FileContext
 
 def main(instance_id):
     print(instance_id)
-    instance = get_moatless_instance(split='verified',instance_id=instance_id)  # 获得的instance是本地下载下来有点删改属性的swe-bench
+    instance = get_moatless_instance(split='verified',instance_id=instance_id)  # The instance obtained is a locally downloaded swe-bench with some modified attributes
     repository = create_repository(instance)
     code_index = CodeIndex.from_index_name(
         instance["instance_id"], file_repo=repository
@@ -27,10 +27,10 @@ def main(instance_id):
 
 
 if __name__ == '__main__':
-    # 创建 ArgumentParser 对象
+    # Create ArgumentParser object
     parser = argparse.ArgumentParser(description="Process some arguments.")
 
-    # 添加 instance_id 参数，可以是列表或字符串，默认为空，必须的参数
+    # Add instance_id parameter, can be a list or string, default is empty, required parameter
     # parser.add_argument("--instance_ids", nargs='+', default=[], required=True,
     #                     help="The instance ID(s), can be a list or a single string.")
     parser.add_argument("--instance_ids", type=str, required=True,

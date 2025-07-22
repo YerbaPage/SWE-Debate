@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class FindCalledObjectArgs(SearchBaseArgs):
     """
-    这个函数就是FindCodeSnippet套了一层壳，输入是模型认为有用的调用对象的名字，会返回一段代码中被调用的对象的具体实现
+    This function is a wrapper around FindCodeSnippet, input is the name of called objects that the model thinks are useful, returns the specific implementation of objects called in a code segment
     """
 
     called_object: str = Field(..., description="The exact called object to find.")

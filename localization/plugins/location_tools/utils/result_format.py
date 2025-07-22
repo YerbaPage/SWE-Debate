@@ -66,7 +66,7 @@ class QueryResult:
         self.query_info_list = []
         self.insert_query_info(query_info)
         
-        # 根据传入参数进行不同的初始化逻辑
+        # Initialize differently based on passed parameters
         if nid is not None:
             self.nid = nid
             

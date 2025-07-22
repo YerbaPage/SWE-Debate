@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-通用的SWE-Search评测结果处理脚本
-支持处理任意experience目录，提取patch信息和统计评测结果
+Universal SWE-Search evaluation result processing script
+Supports processing arbitrary experience directories, extracting patch information and statistical evaluation results
 """
 
 import json
@@ -12,10 +12,10 @@ from typing import Dict, List, Set
 
 def process_experience_directory(experience_dir: Path) -> tuple:
     """
-    处理experience目录，提取所有实例的patch和评测结果
+    Process experience directory, extract all instance patches and evaluation results
     
     Args:
-        experience_dir: experience目录的路径
+        experience_dir: Path to the experience directory
     
     Returns:
         tuple: (patches_data, stats_data)
@@ -39,36 +39,36 @@ def process_experience_directory(experience_dir: Path) -> tuple:
         "schema_version": 2
     }
     
-    # 获取所有实例目录
+    # Get all instance directories
     instance_dirs = [d for d in experience_dir.iterdir() if d.is_dir()]
     stats["total_instances"] = len(instance_dirs)
     
-    print(f"发现 {len(instance_dirs)} 个实例目录")
+    print(f"Found {len(instance_dirs)} instance directories")
     
     for instance_dir in sorted(instance_dirs):
         instance_id = instance_dir.name
         
-        # 查找报告文件（支持不同的日期格式）
+        # Look for report files (supports different date formats)
         report_files = list(instance_dir.glob("*_report.json"))
         if not report_files:
             print(f"Warning: Report file not found for {instance_id}")
             stats["incomplete_ids"].append(instance_id)
             continue
             
-        # 使用找到的第一个报告文件
+        # Use the first report file found
         report_file = report_files[0]
         
         try:
             with open(report_file, 'r', encoding='utf-8') as f:
                 report_data = json.load(f)
                 
-            # 检查必要字段
+            # Check required fields
             if "instance_id" not in report_data:
                 print(f"Warning: Missing instance_id in {instance_id}")
                 stats["error_ids"].append(instance_id)
                 continue
                 
-            # 提取patch信息
+            # Extract patch information
             patch = report_data.get("patch", "")
             if patch:
                 patches_data.append({
@@ -81,7 +81,7 @@ def process_experience_directory(experience_dir: Path) -> tuple:
                 stats["empty_patch_ids"].append(instance_id)
                 stats["empty_patch_instances"] += 1
                 
-            # 统计评测结果
+            # Statistics for evaluation results
             if "patch_applied" in report_data and "resolved" in report_data:
                 stats["completed_ids"].append(instance_id)
                 stats["completed_instances"] += 1
@@ -107,17 +107,17 @@ def process_experience_directory(experience_dir: Path) -> tuple:
     return patches_data, stats
 
 def main():
-    parser = argparse.ArgumentParser(description='处理SWE-Search评测结果')
+    parser = argparse.ArgumentParser(description='Process SWE-Search evaluation results')
     parser.add_argument('experience_dir', nargs='?', 
-                       help='experience目录路径 (默认: tmp/SWE_Search_deepseek0324_verified75_REACT/experience)')
+                       help='Experience directory path (default: tmp/SWE_Search_deepseek0324_verified75_REACT/experience)')
     parser.add_argument('-o', '--output-prefix', default='swe_search_verified75',
-                       help='输出文件前缀 (默认: swe_search_verified75)')
+                       help='Output file prefix (default: swe_search_verified75)')
     parser.add_argument('--base-dir', default='.',
-                       help='基础目录 (默认: 当前目录)')
+                       help='Base directory (default: current directory)')
     
     args = parser.parse_args()
     
-    # 设置路径
+    # Set paths
     base_dir = Path(args.base_dir).resolve()
     
     if args.experience_dir:
@@ -133,10 +133,10 @@ def main():
     
     print(f"Processing experience directory: {experience_dir}")
     
-    # 处理数据
+    # Process data
     patches_data, stats = process_experience_directory(experience_dir)
     
-    # 保存patches到JSONL文件
+    # Save patches to JSONL file
     patches_file = base_dir / f"{args.output_prefix}.jsonl"
     with open(patches_file, 'w', encoding='utf-8') as f:
         for patch_entry in patches_data:
@@ -144,26 +144,26 @@ def main():
     
     print(f"Saved {len(patches_data)} patches to {patches_file}")
     
-    # 保存统计结果到JSON文件
+    # Save statistics to JSON file
     stats_file = base_dir / f"{args.output_prefix}_result.json"
     with open(stats_file, 'w', encoding='utf-8') as f:
         json.dump(stats, f, indent=2, ensure_ascii=False)
     
     print(f"Saved statistics to {stats_file}")
     
-    # 打印统计信息
-    print("\n=== 统计信息 ===")
-    print(f"总实例数: {stats['total_instances']}")
-    print(f"提交实例数: {stats['submitted_instances']}")
-    print(f"完成实例数: {stats['completed_instances']}")
-    print(f"解决实例数: {stats['resolved_instances']}")
-    print(f"未解决实例数: {stats['unresolved_instances']}")
-    print(f"空patch实例数: {stats['empty_patch_instances']}")
-    print(f"错误实例数: {stats['error_instances']}")
+    # Print statistics
+    print("\n=== Statistics ===")
+    print(f"Total instances: {stats['total_instances']}")
+    print(f"Submitted instances: {stats['submitted_instances']}")
+    print(f"Completed instances: {stats['completed_instances']}")
+    print(f"Resolved instances: {stats['resolved_instances']}")
+    print(f"Unresolved instances: {stats['unresolved_instances']}")
+    print(f"Empty patch instances: {stats['empty_patch_instances']}")
+    print(f"Error instances: {stats['error_instances']}")
     
     if stats['resolved_instances'] > 0 and stats['submitted_instances'] > 0:
         success_rate = stats['resolved_instances'] / stats['submitted_instances'] * 100
-        print(f"成功率: {success_rate:.2f}% ({stats['resolved_instances']}/{stats['submitted_instances']})")
+        print(f"Success rate: {success_rate:.2f}% ({stats['resolved_instances']}/{stats['submitted_instances']})")
     
     return 0
 

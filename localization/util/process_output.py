@@ -69,7 +69,7 @@ def get_loc_results_from_raw_outputs(instance_id, raw_outputs, include_variable=
     all_found_files = [[] for _ in range(len(raw_outputs))]
     all_found_modules = [[] for _ in range(len(raw_outputs))]
     all_found_entities = [[] for _ in range(len(raw_outputs))]
-    all_entity_with_code = [[] for _ in range(len(raw_outputs))]  # 添加这行
+    all_entity_with_code = [[] for _ in range(len(raw_outputs))]  # Add this line
     
     for i, sample in enumerate(raw_outputs):
         found_files, found_edit_locs = parse_raw_loc_output(sample, valid_files)
@@ -100,7 +100,7 @@ def get_loc_results_from_raw_outputs(instance_id, raw_outputs, include_variable=
                 if entity not in edit_modules:
                     edit_modules.append(entity)
 
-        # 在现有的实体处理逻辑后添加  
+        # Add after existing entity processing logic  
         entity_with_code = []  
         for entity in filtered_edit_entities:  
             if searcher.has_node(entity):  
@@ -115,9 +115,9 @@ def get_loc_results_from_raw_outputs(instance_id, raw_outputs, include_variable=
         
         all_found_entities[i] = filtered_edit_entities
         all_found_modules[i] = edit_modules
-        all_entity_with_code[i] = entity_with_code  # 添加这行
+        all_entity_with_code[i] = entity_with_code  # Add this line
     
-    # 修改返回值，返回最后一个样本的entity_with_code
+    # Modify return value to return entity_with_code of the last sample
     final_entity_with_code = all_entity_with_code[-1] if all_entity_with_code else []
     return all_found_files, all_found_modules, all_found_entities, final_entity_with_code
 

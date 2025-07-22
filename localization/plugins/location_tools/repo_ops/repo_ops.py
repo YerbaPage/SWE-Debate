@@ -200,10 +200,10 @@ def get_code_block_by_line_nums(query_info, context_window=20):
     res_modules = []
     # res_code_blocks = None
     for line in line_nums:
-        # 首先检查是哪个module的代码
+        # First check which module's code this is
         module_data = get_module_name_by_line_num(file_path, line)
         
-        # 如果不是某个module, 则搜索上下20行
+        # If not part of a module, search 20 lines above and below
         if not module_data:
             min_line_num = max(1, line - context_window)
             max_line_num = min(file_data['end_line'], line + context_window)
