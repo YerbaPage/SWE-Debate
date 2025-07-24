@@ -26,7 +26,6 @@ This project integrates an advanced **Entity Localization Pipeline** based on th
 </div>
 
 
-```
 
 ## 🚀 Quick Start
 
