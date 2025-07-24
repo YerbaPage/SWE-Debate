@@ -176,5 +176,3 @@ search_tree.persist(persist_path)
 This project draws inspiration from and builds upon the methodologies presented in LocAgent. We acknowledge their contributions to the field of automated code localization.
 
 ---
-
-# Updated by lihan0421
