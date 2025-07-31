@@ -470,7 +470,7 @@ def main(instance_id, max_iterations, max_finish_nodes, result_path=None,use_tes
                     
                     eva2rollout['source_tree_path'] = persist_path
                     eva2rollout['debate_node'] = str(finished_node.node_id)
-                    save2json(eva2rollout, f'/home/swebench/SWE-Search/tmp_amb_1/trajectory/{instance_id}/eval2rollout.json')
+                    save2json(eva2rollout, f'/tmp/trajectory/{instance_id}/eval2rollout.json')
 
                     if not search_tree.get_finished_nodes() and finished_node.file_context.generate_git_patch():
                         tmp = {
@@ -481,8 +481,8 @@ def main(instance_id, max_iterations, max_finish_nodes, result_path=None,use_tes
                             'source_tree_path': persist_path,
                             'debate_node': str(finished_node.node_id),
                         }
-                        add_data_to_jsonl('/home/swebench/SWE-Search/tmp_amb_1_patch_1.jsonl', tmp)
-                        add_data_to_jsonl('/home/swebench/SWE-Search/tmp_amb_1_patch_2.jsonl', tmp)
+                        add_data_to_jsonl('/tmp_patch_1.jsonl', tmp)
+                        add_data_to_jsonl('/tmp_patch_2.jsonl', tmp)
 
                     new_eval_objects = []
                     for i in search_tree.get_finished_nodes():
@@ -501,11 +501,11 @@ def main(instance_id, max_iterations, max_finish_nodes, result_path=None,use_tes
                         new_eval_objects.append(tmp)
 
                     if len(new_eval_objects) > 1:
-                        add_data_to_jsonl('/home/swebench/SWE-Search/tmp_amb_1_patch_1.jsonl', new_eval_objects[0])
-                        add_data_to_jsonl('/home/swebench/SWE-Search/tmp_amb_1_patch_2.jsonl', new_eval_objects[1])
+                        add_data_to_jsonl('/tmp_patch_1.jsonl', new_eval_objects[0])
+                        add_data_to_jsonl('/tmp_patch_2.jsonl', new_eval_objects[1])
                     elif len(new_eval_objects) == 1:
-                        add_data_to_jsonl('/home/swebench/SWE-Search/tmp_amb_1_patch_1.jsonl', new_eval_objects)
-                        add_data_to_jsonl('/home/swebench/SWE-Search/tmp_amb_1_patch_2.jsonl', new_eval_objects)
+                        add_data_to_jsonl('/tmp_patch_1.jsonl', new_eval_objects)
+                        add_data_to_jsonl('/tmp_patch_2.jsonl', new_eval_objects)
                     
 
                     tmp = {
@@ -513,7 +513,7 @@ def main(instance_id, max_iterations, max_finish_nodes, result_path=None,use_tes
                         "instance_id": instance_id,
                         "model_patch": finished_node.file_context.generate_git_patch(),
                     }   
-                    add_data_to_jsonl('/home/swebench/SWE-Search/tmp_amb_1_prediction_patch.jsonl', tmp)
+                    add_data_to_jsonl('/tmp_prediction_patch.jsonl', tmp)
 
             else:
                 instance_logger.warning("⚠️ Finished node not found - the search ended normally but no solution was found")
