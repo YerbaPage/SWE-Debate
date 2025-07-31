@@ -34,10 +34,6 @@ This project integrates an advanced **Entity Localization Pipeline** based on th
 ### Installation Steps
 
 1. **Clone the project**
-```bash
-git clone https://github.com/YerbaPage/SWE-Debate
-cd SWE-Debate
-```
 
 2. **Install dependencies**
 ```bash
